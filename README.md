@@ -41,9 +41,23 @@ written in PHP, so `ext-gd` is not needed either.
 
 ## Install
 
-```bash
-composer require cyrnetix/x11
+Not on Packagist, so point Composer at the repository:
+
+```jsonc
+{
+    "repositories": [
+        { "type": "vcs", "url": "https://github.com/cyrnetix/x11.git" }
+    ],
+    "require": {
+        "cyrnetix/x11": "^0.1"
+    }
+}
 ```
+
+**`0.x` means the API can change under you.** `^0.1` pins you to the `0.1.*`
+line, which is the containment Composer gives a pre-1.0 package — a `0.2.0` will
+not be picked up silently. To follow the branch instead of a release, use
+`dev-main`.
 
 ## Themes
 
@@ -140,8 +154,8 @@ X server — it writes into a fake connection and reads the bytes back out.
 
 ## Status and limits
 
-It works, and it is used for two small internal tools of mine — which is a
-different claim from "production ready". This is a hobby project built with AI
+**Current release: `v0.1.0`.** It works, and it is used for two small
+internal tools of mine — which is a different claim from "production ready". This is a hobby project built with AI
 assistance, so treat the API as unstable and read the code before you depend on
 it. The upside of that provenance is that almost every non-obvious decision has a
 comment saying *why*, usually naming the bug that produced it.
