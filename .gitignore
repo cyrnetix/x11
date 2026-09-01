@@ -1,0 +1,18 @@
+# Composer
+/vendor/
+composer.phar
+
+# IDE and local agent config
+/.idea/
+/.vscode/
+*.iml
+/.claude/
+/CLAUDE.md
+
+# Runtime
+/var/
+*.log
+
+# Local scratch work
+/scratchpad/
+/tmp/
