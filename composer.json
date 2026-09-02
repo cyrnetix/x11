@@ -1,0 +1,45 @@
+{
+    "name": "cyrnetix/x11",
+    "description": "A from-scratch X11 client and themeable widget toolkit in PHP, speaking the wire protocol directly.",
+    "type": "library",
+    "keywords": [
+        "x11",
+        "gui",
+        "widget",
+        "toolkit",
+        "desktop",
+        "reactphp",
+        "theme",
+        "retro"
+    ],
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1",
+        "psr/event-dispatcher": "^1.0",
+        "psr/log": "^2.0 || ^3.0",
+        "react/react": "^1.4",
+        "clue/mq-react": "^1.5",
+        "monolog/monolog": "^3.0"
+    },
+    "suggest": {
+        "react/filesystem": "Non-blocking directory listings for the file dialog and filesystem tree (pass an adapter to DirectoryLister / FilesystemTreeProvider). Only a dev release exists, so requiring it means relaxing minimum-stability; without it both read directories directly."
+    },
+    "autoload": {
+        "psr-4": {
+            "Cyrnetix\\X11\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Cyrnetix\\X11\\Example\\": "example/lib/"
+        }
+    },
+    "scripts": {
+        "test": "php tests/run.php"
+    },
+    "authors": [
+        {
+            "name": "Ramon Ennik"
+        }
+    ]
+}
