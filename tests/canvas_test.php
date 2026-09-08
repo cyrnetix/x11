@@ -194,6 +194,28 @@ $check('and stops there',                $canvas->pixelAt(6, 14), [255, 255, 255
 $check('leaving the neighbours alone',   $canvas->pixelAt(7, 8), [255, 255, 255]);
 $check('with one damage rect, not ten',  $canvas->takeDamage()->toArray(), [6, 4, 1, 10]);
 
+// The textured counterpart: a run of pixels the caller prepared.
+$canvas->clear([255, 255, 255]);
+$canvas->takeDamage();
+$run = pack('V', 0xFF010203) . pack('V', 0xFF040506) . pack('V', 0xFF070809);
+$canvas->putSpan(11, 6, $run);
+$check('a prepared run lands pixel for pixel',
+    [$canvas->pixelAt(11, 6), $canvas->pixelAt(11, 7), $canvas->pixelAt(11, 8)],
+    [[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+$check('and damages just its column', $canvas->takeDamage()->toArray(), [11, 6, 1, 3]);
+
+// Clipped at the top, and what lands must stay aligned with what was asked for:
+// the first two pixels fall above the image, so row 0 gets the *third*.
+$canvas->putSpan(12, -2, $run);
+$check('a run overhanging the top keeps its alignment', $canvas->pixelAt(12, 0), [7, 8, 9]);
+$check('and damages only what landed', $canvas->takeDamage()->toArray(), [12, 0, 1, 1]);
+
+$canvas->putSpan(13, 29, $run);
+$check('one overhanging the bottom is truncated', $canvas->takeDamage()->toArray(), [13, 29, 1, 1]);
+$canvas->putSpan(99, 0, $run);
+$canvas->putSpan(5, 0, '');
+$check('an empty run or a bad column draws nothing', $canvas->damage()->isEmpty(), true);
+
 // Once the damage covers everything the widget stops unioning — a renderer
 // writing thousands of spans over a cleared image was allocating a rectangle
 // each time to widen one that already covered it. What must not change is the

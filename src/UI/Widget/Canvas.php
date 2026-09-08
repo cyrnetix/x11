@@ -380,6 +380,52 @@ final class Canvas extends Widget implements Bounded
     }
 
     /**
+     * Write a prepared run of pixels down one column.
+     *
+     * The textured counterpart to {@see fillSpan()}: a renderer that samples a
+     * different colour per pixel — a wall texture, a gradient, a scanline of
+     * computed output — builds the run itself and hands it over whole. $pixels
+     * is 4 bytes each in this widget's own order, which is what
+     * {@see \Cyrnetix\X11\Drawing\Renderer::putImage()} takes and what
+     * {@see \Cyrnetix\X11\Theme\Palette::pixel()} builds, so a caller with a
+     * pre-packed lookup table writes straight from it with no conversion at all.
+     *
+     * Clipped at both ends like a span, because a wall taller than the screen is
+     * the normal case rather than an error: pixels that fall above the image are
+     * skipped over in the source, so what lands stays aligned with what was
+     * asked for.
+     *
+     * @param string $pixels 4 bytes per pixel, top to bottom.
+     */
+    public function putSpan(int $x, int $top, string $pixels): void
+    {
+        if ($x < 0 || $x >= $this->imageWidth) return;
+
+        $count = intdiv(strlen($pixels), self::BPP);
+        if ($count === 0) return;
+
+        // Skip the part above the image rather than shifting the rest up.
+        $skip   = $top < 0 ? min($count, -$top) : 0;
+        $first  = $top + $skip;
+        $last   = min($this->imageHeight - 1, $top + $count - 1);
+        if ($first > $last) return;
+
+        $offset = $x * self::BPP;
+        $source = $skip * self::BPP;
+
+        for ($y = $first; $y <= $last; $y++) {
+            $this->rows[$y][$offset]     = $pixels[$source];
+            $this->rows[$y][$offset + 1] = $pixels[$source + 1];
+            $this->rows[$y][$offset + 2] = $pixels[$source + 2];
+            $this->rows[$y][$offset + 3] = $pixels[$source + 3];
+            $source += self::BPP;
+        }
+
+        $this->drawnOn = true;
+        $this->damaged(Rect::of($x, $first, 1, $last - $first + 1));
+    }
+
+    /**
      * A straight line, Bresenham, $size pixels thick — the pencil, and the only
      * primitive a freehand drag needs: pointer motion arrives in jumps, so a
      * stroke is a chain of segments rather than a chain of points.
