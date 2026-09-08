@@ -216,6 +216,26 @@ $canvas->putSpan(99, 0, $run);
 $canvas->putSpan(5, 0, '');
 $check('an empty run or a bad column draws nothing', $canvas->damage()->isEmpty(), true);
 
+// Across a row instead of down a column: the cheap direction, because a
+// row-major buffer stores it contiguously.
+$canvas->clear([255, 255, 255]);
+$canvas->takeDamage();
+$canvas->putRow(9, 12, $run);
+$check('a row lands pixel for pixel',
+    [$canvas->pixelAt(12, 9), $canvas->pixelAt(13, 9), $canvas->pixelAt(14, 9)],
+    [[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+$check('and damages just its row', $canvas->takeDamage()->toArray(), [12, 9, 3, 1]);
+$check('leaving the row below alone', $canvas->pixelAt(12, 10), [255, 255, 255]);
+
+$canvas->putRow(10, -2, $run);
+$check('a row overhanging the left keeps its alignment', $canvas->pixelAt(0, 10), [7, 8, 9]);
+$canvas->takeDamage();
+$canvas->putRow(11, 39, $run);
+$check('and one overhanging the right is truncated', $canvas->takeDamage()->toArray(), [39, 11, 1, 1]);
+$canvas->putRow(99, 0, $run);
+$canvas->putRow(5, 0, '');
+$check('a bad row or an empty run draws nothing', $canvas->damage()->isEmpty(), true);
+
 // Once the damage covers everything the widget stops unioning — a renderer
 // writing thousands of spans over a cleared image was allocating a rectangle
 // each time to widen one that already covered it. What must not change is the
