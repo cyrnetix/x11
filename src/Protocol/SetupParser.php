@@ -77,6 +77,11 @@ final class SetupParser
                 depth:        $screen['rootDepth'],
                 visual:       $screen['rootVisual'],
                 argbVisual:   $this->findArgbVisual($reply, $offset + 40, $screen['numDepths']),
+                // Both only matter to PutImage, which hands the server raw
+                // memory rather than protocol fields: it has to be in the
+                // server's byte order, and it has to fit in one request.
+                imageByteOrder:   $fixed['imageByte'],
+                maxRequestLength: $fixed['maxReq'],
             ),
             $totalLength,
         ];

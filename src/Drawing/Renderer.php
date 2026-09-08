@@ -47,6 +47,21 @@ final class Renderer
     /** The clip in force, so {@see withClip()} can nest and restore it. */
     private ?Rect $clip = null;
 
+    /**
+     * What {@see putImage()} needs to know about the server, none of which the
+     * other opcodes care about: a PutImage carries raw memory rather than
+     * protocol fields, so it must state the drawable's depth, be laid out in the
+     * server's byte order, and fit inside one request.
+     *
+     * A depth of 0 means nobody has said — {@see X11Client} calls
+     * {@see setImageFormat()} wherever it initialises a renderer — and
+     * {@see putImage()} then declines rather than guessing at a malformed
+     * request.
+     */
+    private int  $imageDepth     = 0;
+    private bool $imageLsbFirst  = true;
+    private int  $maxRequestWords = 65535;
+
     /** Server font ids. The bold one is 0 until (and unless) one is opened. */
     private int $fontId     = 0;
     private int $boldFontId = 0;
@@ -152,6 +167,44 @@ final class Renderer
     public function isTranslucent(): bool
     {
         return $this->opaqueAlpha !== 0;
+    }
+
+    /**
+     * Tell the renderer what a {@see putImage()} has to look like: the depth of
+     * the window it draws into, whether the server reads pixels little-endian,
+     * and the longest request it will accept (in 4-byte words).
+     *
+     * @see \Cyrnetix\X11\Event\X11SetupCompleteEvent::$imageByteOrder
+     */
+    public function setImageFormat(int $depth, bool $lsbFirst, int $maxRequestWords): void
+    {
+        $this->imageDepth      = $depth;
+        $this->imageLsbFirst   = $lsbFirst;
+        // Six words are the PutImage header, so seven is the smallest value
+        // that can carry a single pixel. Floored there rather than at something
+        // comfortable: a bigger floor would silently ignore what the server
+        // said, and the chunking is the one thing that depends on it.
+        $this->maxRequestWords = max(7, $maxRequestWords);
+    }
+
+    /** True when {@see putImage()} knows enough about the server to send one. */
+    public function canPutImage(): bool
+    {
+        return $this->isReady() && $this->imageDepth !== 0;
+    }
+
+    /**
+     * The clip in force, or null when drawing is unbounded.
+     *
+     * For a painter that blits a framebuffer: the server would clip a whole-image
+     * PutImage correctly, but the bytes still cross the socket. Asking what the
+     * clip is turns a region repaint into a blit of just that region — which is
+     * what `BitBlt(ps.hdc, ps.rcPaint, …)` was doing in the window-message model
+     * this borrows from.
+     */
+    public function clipRect(): ?Rect
+    {
+        return $this->clip;
     }
 
     /** Sets font metrics. */
@@ -530,6 +583,101 @@ final class Renderer
             $this->setForeground(...$rgb);
             $this->fillRect($x, $y + $offset, $width, $span);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Images  (PutImage, opcode 72)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Blit a client-side framebuffer into the window.
+     *
+     * This is the escape hatch from drawing *primitives* to drawing *pixels*: a
+     * caller that has computed an image itself — a rasterised shape, a scaled
+     * bitmap, a paint document — hands the memory over and the server copies it
+     * in. It is the X11 counterpart of Win32's `CreateDIBSection` + `BitBlt`
+     * pair, and it has the same shape: one buffer that is both a plain array of
+     * pixels to write into and something the display can blit.
+     *
+     * $pixels is row-major, 4 bytes per pixel, `$width` pixels per row, each
+     * pixel a little-endian `0xAARRGGBB` — the same value {@see setForeground()}
+     * builds, so a canvas and a bevel drawn beside it agree about what a colour
+     * is. The alpha byte matters on an ARGB window and is ignored elsewhere, so
+     * a framebuffer should carry 0xFF there rather than 0: a zero alpha punches
+     * a hole through the window exactly like {@see fillTransparent()}.
+     *
+     * $pixels holds *exactly* the rectangle being blitted — the caller crops,
+     * because it is the one that knows how its framebuffer is stored, and a
+     * repaint of part of a canvas should cost only that part. Handing over the
+     * whole image and letting the GC clip throw most of it away is correct but
+     * pays for every byte.
+     *
+     * ZPixmap at 32 bits per pixel is assumed, which is what every server
+     * reports for depths 24 and 32. The rest of the toolkit already assumes a
+     * TrueColor visual with 0x00RRGGBB masks — {@see \Cyrnetix\X11\Theme\Palette::pixel()}
+     * builds pixel values that way — so this narrows nothing that was open.
+     *
+     * @param string $pixels $width * $height pixels, row-major, 4 bytes each.
+     */
+    public function putImage(
+        string $pixels,
+        int $width, int $height,
+        int $destX, int $destY,
+    ): void {
+        if (!$this->canPutImage())       return;
+        if ($width <= 0 || $height <= 0) return;
+
+        $rowBytes = $width * 4;
+        if (strlen($pixels) < $rowBytes * $height) return;
+
+        // The request's length field is 16 bits of 4-byte words, so a big image
+        // goes out as several PutImages. Chunks are whole rows: a row only fails
+        // to fit above ~65 000 pixels wide, which X11's 16-bit coordinates rule
+        // out anyway.
+        $budget   = ($this->maxRequestWords - 6) * 4;
+        $rowsPer  = max(1, intdiv($budget, $rowBytes));
+
+        for ($row = 0; $row < $height; $row += $rowsPer) {
+            $rows = min($rowsPer, $height - $row);
+            $data = substr($pixels, $row * $rowBytes, $rows * $rowBytes);
+
+            if (!$this->imageLsbFirst) {
+                $data = self::swapPixelBytes($data);
+            }
+
+            $pad = (4 - (strlen($data) % 4)) % 4;
+
+            $this->send(
+                // format 2 = ZPixmap, left-pad 0 (required for ZPixmap).
+                pack(
+                    'CCvVVvvssCCv', 72, 2, 6 + intdiv(strlen($data) + $pad, 4),
+                    $this->windowId, $this->gcId,
+                    $width, $rows, $destX, $destY + $row, 0, $this->imageDepth, 0,
+                )
+                . $data . str_repeat("\x00", $pad),
+            );
+        }
+    }
+
+    /**
+     * Reverse every 4-byte pixel, for a server that reads them big-endian.
+     *
+     * The pixels are memory rather than protocol fields, so nothing byte-swaps
+     * them on the way out. Done a slice at a time because the whole chunk can be
+     * a quarter of a megabyte: `pack('N*', ...)` over that in one call spreads
+     * 65 000 arguments, and the point of a rarely-taken path is not to be the
+     * one that falls over.
+     */
+    private static function swapPixelBytes(string $data): string
+    {
+        $swapped = '';
+
+        // A multiple of 4, so no pixel is split across two slices.
+        foreach (str_split($data, 4096) as $slice) {
+            $swapped .= pack('N*', ...array_values((array) unpack('V*', $slice)));
+        }
+
+        return $swapped;
     }
 
     // -------------------------------------------------------------------------

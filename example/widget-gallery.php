@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
+// The Canvas tab's geometry, which is a plain class with no idea it is being
+// drawn by a widget — see example/lib/ and tests/wirecube_test.php.
+require __DIR__ . '/lib/WireCube.php';
+
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
@@ -69,7 +73,9 @@ use Cyrnetix\X11\UI\Event\UpDownChangedEvent;
 use Cyrnetix\X11\UI\Event\WindowCloseRequestedEvent;
 use Cyrnetix\X11\UI\MessageBoxFlags;
 use Cyrnetix\X11\UI\KeyTranslator;
+use Cyrnetix\X11\Example\WireCube;
 use Cyrnetix\X11\UI\Painter\ButtonPainter;
+use Cyrnetix\X11\UI\Painter\CanvasPainter;
 use Cyrnetix\X11\UI\Painter\CheckboxPainter;
 use Cyrnetix\X11\UI\Painter\ComboBoxPainter;
 use Cyrnetix\X11\UI\Painter\DateTimePickerPainter;
@@ -98,6 +104,7 @@ use Cyrnetix\X11\UI\DoubleClickDetector;
 use Cyrnetix\X11\UI\SyncEventDispatcher;
 use Cyrnetix\X11\UI\WidgetTree;
 use Cyrnetix\X11\UI\Widget\Button;
+use Cyrnetix\X11\UI\Widget\Canvas;
 use Cyrnetix\X11\UI\Widget\Checkbox;
 use Cyrnetix\X11\UI\Widget\ComboBox;
 use Cyrnetix\X11\UI\Widget\DateTimePicker;
@@ -312,6 +319,7 @@ $handlers = [
     new Cyrnetix\X11\UI\Handler\CheckboxHandler($widgetTree, $client, $renderer, $logger, new CheckboxPainter($themes)),
     new Cyrnetix\X11\UI\Handler\RadioButtonHandler($widgetTree, $client, $renderer, $logger, new RadioButtonPainter($themes)),
     new Cyrnetix\X11\UI\Handler\ListViewHandler($widgetTree, $client, $doubleClick, new ListViewPainter($themes)),
+    new Cyrnetix\X11\UI\Handler\CanvasHandler($widgetTree, $client, new CanvasPainter($themes)),
     $treeViewHandler,
 
     // Display-only handlers (paint() only, all try* return false).
@@ -801,6 +809,49 @@ $uiRegistry->addListener(TrackbarChangedEvent::class, static function (TrackbarC
     ]);
 });
 
+// ---- Canvas demo tab -------------------------------------------------------
+// A framebuffer and the software renderer that fills it. The application
+// computes every pixel and PutImage moves them across in one request, which is
+// all a mid-90s Windows game did between draining the message queue and
+// blitting its DIB section.
+//
+// Two things this tab is here to show. The cube's colours are the *picture* and
+// so are the app's to choose, while the well around it is the theme's — switch
+// era from the View menu and only the frame changes. And the animation repaints
+// nothing but the canvas: 280x190 costs 3.3 ms of PHP and 207 kB a frame, where
+// a full window repaint would be all of that plus every other widget, twenty
+// times a second.
+// The picture's own colours. Deliberately literals, and deliberately not from
+// the palette: `src/Theme` owns how the *window* looks, and a drawing that
+// changed colour when the era did would be a bug rather than a feature.
+const CUBE_PAPER = [ 16,  16,  32];
+const CUBE_INK   = [120, 255, 160];
+
+$canvasTabIndex = count($tabView->getChildren());
+$canvasTab      = $tabView->addTab('Canvas');
+
+$canvasTab->addChild(new Label('A software-rendered wireframe, blitted with PutImage', 12, 12));
+$canvasTab->addChild(new Label('the well is the theme\'s; the pixels inside it are the app\'s', 12, 32));
+
+$cubeCanvas = new Canvas(12, 56, 284, 194, $uiDispatcher, paper: CUBE_PAPER);
+$canvasTab->addChild($cubeCanvas);
+
+$cube = new WireCube();
+
+/** One frame: clear the paper, project the cube, stroke its twelve edges. */
+$drawCube = static function () use ($cubeCanvas, $cube): void {
+    $cubeCanvas->clear(CUBE_PAPER);
+
+    foreach ($cube->project($cubeCanvas->imageWidth(), $cubeCanvas->imageHeight()) as [$x0, $y0, $x1, $y1]) {
+        $cubeCanvas->drawLine($x0, $y0, $x1, $y1, CUBE_INK);
+    }
+};
+$drawCube();
+
+// No paint callback here: this canvas is a display surface, and the animation
+// below clears the image every frame, so anything drawn on it would last 50 ms.
+// `example/paint.php` is the same widget with a pointer wired to it.
+
 $windowFrame->addChild($tabView);
 
 // Its own root, not a child of the frame: it lives in a separate X11 window, so
@@ -1090,6 +1141,25 @@ $registry->addListener(X11FocusOutEvent::class, static function () use ($windowF
 $registry->addListener(X11SelectionNotifyEvent::class,  $client->onSelectionNotify(...));
 $registry->addListener(X11SelectionRequestEvent::class, $client->onSelectionRequest(...));
 $registry->addListener(X11SelectionClearEvent::class,   $client->onSelectionClear(...));
+
+// --- The Canvas tab's animation ---------------------------------------------
+// Twenty frames a second, and only while that tab is on top. The guard is not an
+// optimisation: redrawRegion() with a subtree paints that subtree whether or not
+// the paint walk would have reached it, so animating a hidden page would draw
+// the cube straight over whichever tab is actually showing.
+$loop->addPeriodicTimer(0.05, static function () use (
+    $tabView, $canvasTabIndex, $cube, $cubeCanvas, $drawCube, $client
+): void {
+    if ($tabView->getActiveIndex() !== $canvasTabIndex) return;
+
+    $cube->advance();
+    $drawCube();
+
+    $damage = $cubeCanvas->takeDamage();
+    if (!$damage->isEmpty()) {
+        $client->redrawRegion($cubeCanvas->toWindow($damage), $cubeCanvas);
+    }
+});
 
 // --- Connect and run --------------------------------------------------------
 

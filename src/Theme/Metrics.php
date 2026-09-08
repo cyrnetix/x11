@@ -137,6 +137,14 @@ final class Metrics
         public readonly int $upDownWidth  = 16,
         public readonly int $upDownHeight = 18,
 
+        // ---- Canvas -----------------------------------------------------
+        /**
+         * Frame a {@see \Cyrnetix\X11\UI\Widget\Canvas} sinks its image behind.
+         * Read by the widget to place the image and by the painter to blit it,
+         * so a theme with a thinner edge really does show more pixels.
+         */
+        public readonly int $canvasBorder = 2,
+
         // ---- Trackbar ---------------------------------------------------
         public readonly int $trackThickness      = 4,
         public readonly int $trackbarThumbLong   = 12,

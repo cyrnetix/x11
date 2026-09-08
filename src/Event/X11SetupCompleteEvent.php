@@ -27,5 +27,21 @@ final class X11SetupCompleteEvent extends AbstractX11Event
          * it left alone read back as opaque black rather than as a hole.
          */
         public readonly int $argbVisual = 0,
+        /**
+         * Byte order the server wants image data in: 0 = LSBFirst, 1 = MSBFirst.
+         * It is the server's *own* endianness, so it is LSBFirst on every local
+         * x86 server and only differs across a connection to a big-endian one.
+         * {@see \Cyrnetix\X11\Drawing\Renderer::putImage()} is the only caller —
+         * the pixels in a PutImage are raw memory, not a value the protocol
+         * byte-swaps for us.
+         */
+        public readonly int $imageByteOrder = 0,
+        /**
+         * Longest request the server accepts, in 4-byte words. A request's
+         * length field is 16 bits, so this cannot exceed 65535 without the
+         * BIG-REQUESTS extension — which is why a framebuffer blit bigger than
+         * about 256 kB has to go out as several PutImages.
+         */
+        public readonly int $maxRequestLength = 65535,
     ) {}
 }

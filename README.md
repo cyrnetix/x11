@@ -90,7 +90,13 @@ progress bars (including a marquee), list boxes, drop-downs, combo boxes,
 tab views, menu bars with submenus, toolbars, rebars, status bars, tooltips,
 tree views with lazy children, list views in "details" mode with sortable
 columns, up-down spinners, a date/time picker with a drop-down calendar, message
-boxes, and a file/folder picker.
+boxes, a file/folder picker, and a canvas.
+
+The canvas is the escape hatch: the application writes pixels into a framebuffer
+and `PutImage` blits them, so anything the toolkit has no widget for — a drawing
+surface, a plot, a software renderer's output — is still a widget. Its frame is
+the theme's; the pixels inside it are yours. Only the damaged rectangle is sent,
+which is what keeps a freehand stroke to a few hundred bytes a motion event.
 
 The window frame is the toolkit's too: it asks the window manager not to
 decorate, then draws the caption, its buttons and the resize border itself, so
@@ -110,6 +116,7 @@ extension, BeOS's partial tab is a genuine hole you can see the desktop through.
 php example/app.php                       # the smallest complete app — read this first
 php example/calculator.php                # a button grid, the keyboard, F2 to cycle themes
 php example/todo.php                      # the open/save dialogs, a menu bar, a checkable list
+php example/paint.php                     # a canvas: tools, undo, a palette that is a canvas
 php example/child-window.php --open-form  # a form in its own top-level window
 php example/widget-gallery.php            # the kitchen sink: every widget, all five themes
 ```
@@ -149,8 +156,9 @@ composer test        # or: php tests/run.php
 ```
 
 Plain scripts rather than PHPUnit: each prints what it checked and exits
-non-zero on failure, so a run reads as a transcript. `caption_test.php` needs no
-X server — it writes into a fake connection and reads the bytes back out.
+non-zero on failure, so a run reads as a transcript. None of them need an X
+server: the ones that check what goes over the wire — `caption_test.php`,
+`canvas_test.php` — write into a fake connection and read the bytes back out.
 
 ## Status and limits
 
@@ -171,6 +179,10 @@ Known gaps:
   rendering.
 - Text is drawn in a proportional face, so anything aligned with spaces will
   look ragged. There is no monospaced third face.
+- A canvas has no scrolling viewport: an image larger than the widget is clipped
+  rather than scrolled. Nor is the GC's raster `function` exposed, so there is no
+  `GXxor` for a rubber band drawn straight onto the window — a canvas restores
+  from a snapshot instead, which is better behaved but needs a framebuffer.
 
 ## Contributing
 

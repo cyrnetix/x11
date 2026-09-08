@@ -74,7 +74,6 @@ final class WidgetManager
         $this->handlers = $handlers;
     }
 
-    /** Adds a child. */
     /**
      * Does the application draw its own window caption and border?
      *
@@ -91,6 +90,10 @@ final class WidgetManager
         ) !== null;
     }
 
+    /**
+     * Register a widget as a root of the tree — one per window, the main
+     * window's frame included.
+     */
     public function addChild(Widget $widget): void
     {
         $this->tree->addRoot($widget);

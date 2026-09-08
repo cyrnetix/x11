@@ -192,6 +192,15 @@ final class X11Client
     private int $depth  = 0;
     private int $visual = 0;
 
+    /**
+     * What the setup reply said about image data, for every renderer's
+     * {@see Renderer::putImage()}: the server's byte order and how long a
+     * request it will take. Only PutImage carries raw memory, so nothing else
+     * needs either.
+     */
+    private int $imageByteOrder   = 0;
+    private int $maxRequestLength = 65535;
+
     /** Font names currently open on $fontId / $boldFontId. */
     private string $fontName     = '';
     private string $boldFontName = '';
@@ -995,6 +1004,9 @@ final class X11Client
         $this->screenWidth  = $setupEvent->screenWidth;
         $this->screenHeight = $setupEvent->screenHeight;
 
+        $this->imageByteOrder   = $setupEvent->imageByteOrder;
+        $this->maxRequestLength = $setupEvent->maxRequestLength;
+
         $this->logger->debug('Server info', [
             'root'   => sprintf('0x%x', $this->root),
             'window' => sprintf('0x%x', $this->windowId),
@@ -1384,8 +1396,7 @@ final class X11Client
         // Learn whether we can give the window a non-rectangular outline.
         $this->queryShapeExtension();
 
-        $this->renderer->init($this->conn, $this->windowId, $this->gcId, $this->gcState);
-        $this->renderer->setTranslucent($this->argbVisual !== 0);
+        $this->attachRenderer($this->renderer, $this->windowId);
         $this->renderer->setFonts($this->fontId);
         $this->logger->debug('Renderer initialised');
 
@@ -1543,8 +1554,7 @@ final class X11Client
         $request .= $values;
         $this->conn->write($request);
 
-        $this->dialogRenderer->init($this->conn, $this->dialogWindowId, $this->gcId, $this->gcState);
-        $this->dialogRenderer->setTranslucent($translucent);
+        $this->attachRenderer($this->dialogRenderer, $this->dialogWindowId);
         $this->logger->debug('Dialog window created', ['id' => sprintf('0x%x', $this->dialogWindowId)]);
     }
 
@@ -1580,8 +1590,7 @@ final class X11Client
         $request .= $values;
         $this->conn->write($request);
 
-        $this->fileDialogRenderer->init($this->conn, $this->fileDialogWindowId, $this->gcId, $this->gcState);
-        $this->fileDialogRenderer->setTranslucent($translucent);
+        $this->attachRenderer($this->fileDialogRenderer, $this->fileDialogWindowId);
         $this->logger->debug('File dialog window created', [
             'id' => sprintf('0x%x', $this->fileDialogWindowId),
         ]);
@@ -1759,8 +1768,7 @@ final class X11Client
         $request .= $values;
         $this->conn->write($request);
 
-        $window->renderer->init($this->conn, $id, $this->gcId, $this->gcState);
-        $window->renderer->setTranslucent($translucent);
+        $this->attachRenderer($window->renderer, $id);
         $window->renderer->setFonts($this->fontId, $this->boldFontId);
         if ($this->fontMetrics !== null) {
             $window->renderer->setFontMetrics($this->fontMetrics);
@@ -2059,6 +2067,23 @@ final class X11Client
             }
         });
         $this->conn->write(pack('CCvV', 47, 0, 2, $this->fontId));
+    }
+
+    /**
+     * Point a renderer at one of this connection's windows.
+     *
+     * Three things, in one place because a renderer given two of them draws
+     * subtly wrong rather than visibly wrong: the shared GC and its cached
+     * state, whether the visual has an alpha channel (so a hole is a hole and
+     * not opaque black), and what the server expects a PutImage to look like —
+     * without that last one a canvas blits nothing at all.
+     */
+    private function attachRenderer(Renderer $renderer, int $windowId): void
+    {
+        $renderer->init($this->conn, $windowId, $this->gcId, $this->gcState);
+        $renderer->setTranslucent($this->argbVisual !== 0);
+        // imageByteOrder: 0 = LSBFirst.
+        $renderer->setImageFormat($this->depth, $this->imageByteOrder === 0, $this->maxRequestLength);
     }
 
     /**
