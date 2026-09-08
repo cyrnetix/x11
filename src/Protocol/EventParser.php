@@ -12,6 +12,7 @@ use Cyrnetix\X11\Event\X11ExposeEvent;
 use Cyrnetix\X11\Event\X11FocusInEvent;
 use Cyrnetix\X11\Event\X11FocusOutEvent;
 use Cyrnetix\X11\Event\X11KeyPressEvent;
+use Cyrnetix\X11\Event\X11KeyReleaseEvent;
 use Cyrnetix\X11\Event\X11MapEvent;
 use Cyrnetix\X11\Event\X11MotionEvent;
 use Cyrnetix\X11\Event\X11SelectionClearEvent;
@@ -63,6 +64,7 @@ final class EventParser
         return match ($type) {
             0  => $this->parseError($raw),
             2  => $this->parseKeyPress($raw),
+            3  => $this->parseKeyRelease($raw),
             4  => $this->parseButtonPress($raw),
             5  => $this->parseButtonRelease($raw),
             6  => $this->parseMotion($raw),
@@ -181,6 +183,27 @@ final class EventParser
         $e = unpack('Ctype/Ckeycode/vseq/Vtime/Vroot/Vevent/Vchild/srootX/srootY/sx/sy/vstate/Csame/Cpad', $raw);
 
         return new X11KeyPressEvent(
+            windowId: $e['event'],
+            keycode:  $e['keycode'],
+            x:        $e['x'],
+            y:        $e['y'],
+            rootX:    $e['rootX'],
+            rootY:    $e['rootY'],
+            time:     $e['time'],
+            state:    $e['state'],
+        );
+    }
+
+    /**
+     * A key coming up. The same record as a press, and needed by anything that
+     * tracks which keys are *held* rather than which were typed.
+     */
+    private function parseKeyRelease(string $raw): X11KeyReleaseEvent
+    {
+        /** @var array<string, int> $e */
+        $e = unpack('Ctype/Ckeycode/vseq/Vtime/Vroot/Vevent/Vchild/srootX/srootY/sx/sy/vstate/Csame/Cpad', $raw);
+
+        return new X11KeyReleaseEvent(
             windowId: $e['event'],
             keycode:  $e['keycode'],
             x:        $e['x'],

@@ -185,6 +185,35 @@ $canvas->drawLine(10, 10, 10, 10, [0, 0, 0], size: 3);
 $check('a thick stroke is centred on its path, not hung off it',
     [$canvas->pixelAt(9, 9), $canvas->pixelAt(11, 11)], [[0, 0, 0], [0, 0, 0]]);
 
+// The wall renderer's primitive: one vertical run per screen column.
+$canvas->clear([255, 255, 255]);
+$canvas->takeDamage();          // the clear's own damage, or the union below covers everything
+$canvas->fillSpan(6, 4, 10, [7, 8, 9]);
+$check('a span fills its column',        [$canvas->pixelAt(6, 4), $canvas->pixelAt(6, 13)], [[7, 8, 9], [7, 8, 9]]);
+$check('and stops there',                $canvas->pixelAt(6, 14), [255, 255, 255]);
+$check('leaving the neighbours alone',   $canvas->pixelAt(7, 8), [255, 255, 255]);
+$check('with one damage rect, not ten',  $canvas->takeDamage()->toArray(), [6, 4, 1, 10]);
+
+// Once the damage covers everything the widget stops unioning — a renderer
+// writing thousands of spans over a cleared image was allocating a rectangle
+// each time to widen one that already covered it. What must not change is the
+// answer: a full-image damage stays full, and taking it starts narrow again.
+$canvas->clear([255, 255, 255]);
+$canvas->fillSpan(3, 5, 4, [1, 2, 3]);
+$check('a span after a clear leaves the damage full', $canvas->takeDamage()->toArray(), [0, 0, 40, 30]);
+$canvas->fillSpan(3, 5, 4, [1, 2, 3]);
+$check('and the next one is tracked narrowly again',  $canvas->takeDamage()->toArray(), [3, 5, 1, 4]);
+
+// A wall taller than the screen is the normal case, not an error: the span is
+// clipped at both ends rather than refused.
+$canvas->fillSpan(9, -20, 200, [1, 1, 1]);
+$check('a span overrunning the image is clipped', $canvas->takeDamage()->toArray(), [9, 0, 1, 30]);
+$check('and painted to the very edges',  [$canvas->pixelAt(9, 0), $canvas->pixelAt(9, 29)], [[1, 1, 1], [1, 1, 1]]);
+
+$canvas->fillSpan(40, 0, 10, [2, 2, 2]);
+$canvas->fillSpan(5, 0, 0, [2, 2, 2]);
+$check('a column outside the image draws nothing', $canvas->damage()->isEmpty(), true);
+
 $canvas->clear([255, 255, 255]);
 $canvas->strokeRect(4, 4, 10, 8, [0, 0, 0]);
 $check('a stroked rect draws its corner',   $canvas->pixelAt(13, 11), [0, 0, 0]);

@@ -81,6 +81,17 @@ final class Canvas extends Widget implements Bounded
     private Rect $damage;
 
     /**
+     * True once the damage covers the whole image.
+     *
+     * A short-circuit with a measured reason: a software renderer clears the
+     * image and then writes thousands of short spans over it, and every one of
+     * those was allocating a rectangle to union into a rectangle that already
+     * covered it. Nothing can widen a full-image damage, so once it is full the
+     * bookkeeping stops until it is taken.
+     */
+    private bool $fullyDamaged = false;
+
+    /**
      * Has anything been drawn into it? Until something has, the paper follows a
      * theme switch; afterwards a switch must not wipe the picture.
      */
@@ -324,6 +335,51 @@ final class Canvas extends Widget implements Bounded
     }
 
     /**
+     * Fill a vertical run in one column.
+     *
+     * The primitive a software renderer actually wants, and the reason it is
+     * here rather than being expressed with the others: a wall in a
+     * Doom-style renderer is drawn as one vertical span per screen column, and
+     * neither existing primitive can carry that.
+     *
+     * - {@see setPixel()} per pixel costs a bounds check, a `pack()` and a
+     *   damage union *each* — measured at 64 ms for a 160x100 screen against
+     *   1.6 ms for the same writes done straight, a factor of forty.
+     * - {@see fillRect()} of a one-pixel-wide rectangle does one
+     *   `substr_replace` per row, and each of those copies the whole row: a
+     *   1280-byte row copied 200 times per column, 320 columns deep, is 82 MB a
+     *   frame.
+     *
+     * So this writes the four bytes in place, row by row, and unions the damage
+     * once for the whole span. Clipped to the image, so a caller may hand it a
+     * span that runs off the top or bottom — which every wall renderer does at
+     * the point where a wall is taller than the screen.
+     *
+     * @param array{int,int,int} $rgb
+     */
+    public function fillSpan(int $x, int $top, int $height, array $rgb): void
+    {
+        if ($x < 0 || $x >= $this->imageWidth || $height <= 0) return;
+
+        $bottom = min($this->imageHeight - 1, $top + $height - 1);
+        $top    = max(0, $top);
+        if ($bottom < $top) return;
+
+        $offset = $x * self::BPP;
+        $pixel  = self::pack($rgb);
+
+        for ($y = $top; $y <= $bottom; $y++) {
+            $this->rows[$y][$offset]     = $pixel[0];
+            $this->rows[$y][$offset + 1] = $pixel[1];
+            $this->rows[$y][$offset + 2] = $pixel[2];
+            $this->rows[$y][$offset + 3] = $pixel[3];
+        }
+
+        $this->drawnOn = true;
+        $this->damaged(Rect::of($x, $top, 1, $bottom - $top + 1));
+    }
+
+    /**
      * A straight line, Bresenham, $size pixels thick — the pencil, and the only
      * primitive a freehand drag needs: pointer motion arrives in jumps, so a
      * stroke is a chain of segments rather than a chain of points.
@@ -458,8 +514,9 @@ final class Canvas extends Widget implements Bounded
      */
     public function takeDamage(): Rect
     {
-        $damage       = $this->damage;
-        $this->damage = Rect::of(0, 0, 0, 0);
+        $damage             = $this->damage;
+        $this->damage       = Rect::of(0, 0, 0, 0);
+        $this->fullyDamaged = false;
 
         return $damage;
     }
@@ -651,6 +708,13 @@ final class Canvas extends Widget implements Bounded
     /** Widen the pending damage to cover $rect. */
     private function damaged(Rect $rect): void
     {
+        if ($this->fullyDamaged) return;
+
         $this->damage = $this->damage->union($rect);
+
+        $this->fullyDamaged = $this->damage->x <= 0
+            && $this->damage->y <= 0
+            && $this->damage->width  >= $this->imageWidth
+            && $this->damage->height >= $this->imageHeight;
     }
 }
