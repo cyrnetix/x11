@@ -289,7 +289,7 @@ $fileDialog->setPlaces((new FilePlaces())->all());
 
 $fileDialogHandler = new Cyrnetix\X11\UI\Handler\FileDialogHandler(
     $widgetTree, $client, new DirectoryLister(), $renderer, $logger,
-    new FileDialogPainter($themes),
+    new FileDialogPainter($themes), $doubleClick,
 );
 
 $handlers = [

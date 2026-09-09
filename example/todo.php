@@ -140,7 +140,7 @@ $fileDialog->setPlaces((new FilePlaces())->all());
 
 $fileDialogHandler = new H\FileDialogHandler(
     $tree, $client, new DirectoryLister(), $renderer, $logger,
-    new P\FileDialogPainter($themes),
+    new P\FileDialogPainter($themes), new DoubleClickDetector(),
 );
 
 $filters = [

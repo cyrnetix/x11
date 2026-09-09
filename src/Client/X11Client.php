@@ -672,26 +672,10 @@ final class X11Client
         $this->conn->write(pack('CCvV', 8, 0, 2, $this->dialogWindowId));
         $this->dialogMapped = true;
         $this->raiseWindow($this->dialogWindowId);
-        // GrabPointer: route every pointer event to the dialog so the parent
-        // can't intercept clicks (and therefore can't be raised over us).
-        // event-mask = ButtonPress | ButtonRelease | PointerMotion | Button1Motion
-        $eventMask = 0x0004 | 0x0008 | 0x0040 | 0x0100;
-        // GrabPointer produces a 32-byte reply (success status). Drop it
-        // explicitly so it doesn't shift the FIFO of clipboard handlers.
-        $this->expectReply(static function (string $raw): void { /* status: ignore */ });
-        $this->conn->write(pack(
-            'CCvVvCCVVV',
-            26,                      // GrabPointer opcode
-            0,                       // owner-events = False (everything to dialog)
-            6,                       // request length (24 bytes / 4)
-            $this->dialogWindowId,   // grab-window
-            $eventMask,
-            1,                       // pointer-mode = Async
-            1,                       // keyboard-mode = Async
-            0,                       // confine-to = None
-            0,                       // cursor = None
-            0,                       // time = CurrentTime
-        ));
+
+        // Route every pointer event to the dialog so the parent can't intercept
+        // clicks (and therefore can't be raised over us).
+        $this->grabPointerFor($this->dialogWindowId, 'message box');
     }
 
     /** Unmaps the message box and releases the pointer grab. */
@@ -699,10 +683,8 @@ final class X11Client
     {
         if ($this->conn === null) return;
 
-        // UngrabPointer — return pointer events to the normal routing.
-        $this->conn->write(pack('CCvV', 27, 0, 2, 0));
-        // UnmapWindow
-        $this->conn->write(pack('CCvV', 10, 0, 2, $this->dialogWindowId));
+        $this->ungrabPointer();
+        $this->conn->write(pack('CCvV', 10, 0, 2, $this->dialogWindowId));   // UnmapWindow
         $this->dialogMapped = false;
     }
 
@@ -1797,7 +1779,7 @@ final class X11Client
         $this->raiseWindow($window->id());
 
         if ($modal) {
-            $this->grabPointerFor($window->id());
+            $this->grabPointerFor($window->id(), 'child window');
         }
     }
 
@@ -1807,7 +1789,7 @@ final class X11Client
         if ($this->conn === null || !$window->exists()) return;
 
         if ($modal) {
-            $this->conn->write(pack('CCvV', 27, 0, 2, 0));   // UngrabPointer
+            $this->ungrabPointer();
         }
         $this->conn->write(pack('CCvV', 10, 0, 2, $window->id()));   // UnmapWindow
     }
@@ -1848,20 +1830,62 @@ final class X11Client
      * owner-events = False, so clicks outside the window arrive here too (with
      * coordinates outside its bounds) rather than reaching the application
      * behind — which is what makes a modal window modal.
+     *
+     * **The one place that grabs.** All three modal windows — a child window,
+     * the message box, the file dialog — came through their own copy of this,
+     * and a copy is where the reply handler gets forgotten.
      */
-    private function grabPointerFor(int $windowId): void
+    private function grabPointerFor(int $windowId, string $what): void
     {
+        // event-mask = ButtonPress | ButtonRelease | PointerMotion | Button1Motion
         $eventMask = 0x0004 | 0x0008 | 0x0040 | 0x0100;
 
-        // GrabPointer returns a status reply; drop it so the shared FIFO stays paired.
-        $this->expectReply(static function (string $raw): void { /* status: ignore */ });
+        // GrabPointer answers with a status, and it is the difference between a
+        // modal window and one the application can be clicked straight through.
+        // Ignoring it — which every copy of this did — means a failed grab looks
+        // exactly like a working one until someone clicks the window behind.
+        $this->expectReply(function (string $raw) use ($what): void {
+            $status = ord($raw[1]);
+            if ($status === 0) return;
+
+            $this->logger->warning('Pointer grab failed', [
+                'for'    => $what,
+                'status' => match ($status) {
+                    1       => 'AlreadyGrabbed',
+                    2       => 'InvalidTime',
+                    3       => 'NotViewable',
+                    4       => 'Frozen',
+                    default => $status,
+                },
+            ]);
+        });
         $this->conn->write(pack(
             'CCvVvCCVVV',
-            26, 0, 6,
-            $windowId,
+            26,          // GrabPointer opcode
+            0,           // owner-events = False (everything to this window)
+            6,           // request length (24 bytes / 4)
+            $windowId,   // grab-window
             $eventMask,
-            1, 1, 0, 0, 0,
+            1,           // pointer-mode = Async
+            1,           // keyboard-mode = Async
+            0,           // confine-to = None
+            0,           // cursor = None
+            0,           // time = CurrentTime
         ));
+    }
+
+    /**
+     * Give pointer events back to the normal routing.
+     *
+     * **This releases whichever grab this client holds**, not a particular
+     * window's — X11 has one active pointer grab per client, not a stack. So a
+     * window that closes without ungrabbing does not merely leak a grab; the
+     * *next* window to close hands input back on its behalf, which is a long way
+     * from where the mistake was made.
+     */
+    private function ungrabPointer(): void
+    {
+        $this->conn->write(pack('CCvV', 27, 0, 2, 0));   // UngrabPointer, time = CurrentTime
     }
     /** The file dialog renderer. */
     public function getFileDialogRenderer(): ?Renderer { return $this->fileDialogRenderer; }
@@ -1894,16 +1918,7 @@ final class X11Client
             $x, $y, $this->fileDialogWidth, $this->fileDialogHeight));
         $this->conn->write(pack('CCvV', 8, 0, 2, $this->fileDialogWindowId));           // MapWindow
         $this->raiseWindow($this->fileDialogWindowId);
-
-        $eventMask = 0x0004 | 0x0008 | 0x0040 | 0x0100;
-        $this->expectReply(static function (string $raw): void { /* status: ignore */ });
-        $this->conn->write(pack(
-            'CCvVvCCVVV',
-            26, 0, 6,
-            $this->fileDialogWindowId,
-            $eventMask,
-            1, 1, 0, 0, 0,
-        ));
+        $this->grabPointerFor($this->fileDialogWindowId, 'file dialog');
     }
 
     /** Unmaps the file picker and releases its pointer grab. */
@@ -1913,7 +1928,7 @@ final class X11Client
 
         if ($this->conn === null || $this->fileDialogWindowId === 0) return;
 
-        $this->conn->write(pack('CCvV', 27, 0, 2, 0));                          // UngrabPointer
+        $this->ungrabPointer();
         $this->conn->write(pack('CCvV', 10, 0, 2, $this->fileDialogWindowId));  // UnmapWindow
     }
 

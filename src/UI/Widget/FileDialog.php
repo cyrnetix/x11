@@ -67,9 +67,10 @@ final class FileDialog extends FormWindow
     /** Called when the dialog has changed itself and the screen is stale. */
     private ?Closure $onChanged = null;
 
-    /** Set by the handler: the two things the dialog can't do alone. */
+    /** Set by the handler: the three things the dialog can't do alone. */
     private ?Closure $onNavigate = null;
     private ?Closure $onAccept   = null;
+    private ?Closure $onDismiss  = null;
 
 
     // ---- Children -------------------------------------------------------
@@ -163,11 +164,15 @@ final class FileDialog extends FormWindow
         // The buttons stay ordinary buttons handled by ButtonHandler — hit-testing
         // them from a handler would swallow the release that clears their pressed
         // state, and they'd stick down.
-        $this->cancelButton->setOnClick(fn() => $this->finish(null));
+        // requestDismiss, not finish: closing has to release the *window* —
+        // unmap it, drop the pointer grab, clear tree modality — and none of
+        // that is the widget's to do. Calling finish() here left the window
+        // mapped with nothing painted on it: a grey box over the application.
+        $this->cancelButton->setOnClick(fn() => $this->requestDismiss(null));
 
         // The caption's close box means the same thing as Cancel, and goes
         // through the same call so the two cannot answer differently.
-        $this->setOnCaptionClose(fn() => $this->finish(null));
+        $this->setOnCaptionClose(fn() => $this->requestDismiss(null));
         $this->acceptButton->setOnClick(function (): void {
             if ($this->onAccept !== null) ($this->onAccept)();
         });
@@ -216,10 +221,39 @@ final class FileDialog extends FormWindow
      */
     public function setOnAccept(?Closure $cb): void   { $this->onAccept   = $cb; }
 
+    /**
+     * How the dialog asks to be *closed* — which is the owner's job, not its own.
+     *
+     * {@see finish()} only hides the widget and reports the result. The dialog
+     * is a real top-level window, so closing it also means unmapping that
+     * window, releasing the pointer grab that makes it modal and clearing
+     * {@see \Cyrnetix\X11\UI\WidgetTree::setModal()} — none of which a widget
+     * can reach. {@see \Cyrnetix\X11\UI\Handler\FileDialogHandler} supplies it.
+     */
+    public function setOnDismiss(?Closure $cb): void  { $this->onDismiss  = $cb; }
+
     /** Asks the owner to read a directory. The dialog does no I/O itself. */
     public function requestNavigate(string $path): void
     {
         if ($this->onNavigate !== null) ($this->onNavigate)($path);
+    }
+
+    /**
+     * Asks the owner to close the dialog. Null means the user cancelled.
+     *
+     * Falls back to {@see finish()} when nothing is wired, so a dialog driven as
+     * a plain widget still reports its result — but an owner that shows it in a
+     * window owes the hook, or the window stays on screen.
+     */
+    public function requestDismiss(?string $path): void
+    {
+        if ($this->onDismiss !== null) {
+            ($this->onDismiss)($path);
+
+            return;
+        }
+
+        $this->finish($path);
     }
 
     /** Tells the owner something on screen is now stale. */
@@ -282,7 +316,14 @@ final class FileDialog extends FormWindow
         $this->filterBox->close();
     }
 
-    /** Fire the result and close. $path null means the user cancelled. */
+    /**
+     * Fire the result and hide the widget. $path null means the user cancelled.
+     *
+     * **This does not close the window.** It hides the widget subtree, which on
+     * its own leaves the X11 window mapped, grabbed and modal — see
+     * {@see requestDismiss()}, which is what the dialog's own Cancel and close
+     * box call. This is the last step of the owner's close, not a way in.
+     */
     public function finish(?string $path): void
     {
         $mode = $this->mode;

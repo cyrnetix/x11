@@ -9,6 +9,8 @@ use Cyrnetix\X11\Drawing\Renderer;
 use Cyrnetix\X11\Event\X11ButtonPressEvent;
 use Cyrnetix\X11\Filesystem\DirectoryLister;
 use Cyrnetix\X11\Filesystem\FilePath;
+use Cyrnetix\X11\Theme\CaptionButton;
+use Cyrnetix\X11\UI\DoubleClickDetector;
 use Cyrnetix\X11\UI\Painter\FileDialogPainter;
 use Cyrnetix\X11\UI\Widget\FileDialog;
 use Cyrnetix\X11\UI\Widget\Widget;
@@ -24,13 +26,21 @@ use Cyrnetix\X11\UI\WidgetTree;
  * which is why adding a widget to the dialog needs no change here.
  *
  * Two things do need hit-testing, because they aren't widgets: the breadcrumb
- * row (drawn by the painter, like a tab strip) and the caption, which is
- * draggable so a dialog can be moved off whatever it's covering.
+ * row (drawn by the painter, like a tab strip) and the caption — its buttons,
+ * and the drag that moves the dialog off whatever it's covering.
+ *
+ * The buttons are tested **before** the drag, or a press on the close box would
+ * also start moving the window. That ordering is the same one
+ * {@see FormWindowHandler} keeps, for the same reason; this handler drew a close
+ * box for two themes without it and the box did nothing at all.
  */
 final class FileDialogHandler extends WidgetHandler
 {
     /** Non-null while a caption drag is in progress: pointer offset into the dialog. */
     private ?array $dragOffset = null;
+
+    /** The caption button held down, so the press reads as a press. */
+    private ?CaptionButton $pressed = null;
 
     /** Guards against a slow listing for a directory the user has already left. */
     private int $listingGeneration = 0;
@@ -45,6 +55,12 @@ final class FileDialogHandler extends WidgetHandler
         private readonly Renderer          $renderer,
         private readonly LoggerInterface   $logger,
         private readonly FileDialogPainter $painter,
+        /**
+         * Only for the window-menu box: Windows 3.1 gave a dialog no close
+         * button at all, and double-clicking that box was the way out. Without
+         * a detector the box is inert, which is worse than not drawing it.
+         */
+        private readonly ?DoubleClickDetector $doubleClick = null,
     ) {}
 
     /** Paints the widget when it is this handler's kind. False leaves it to the next handler. */
@@ -81,6 +97,12 @@ final class FileDialogHandler extends WidgetHandler
         $dialog->setOnNavigate(fn(string $path) => $this->navigate($dialog, $path));
         $dialog->setOnAccept(fn() => $this->accept($dialog));
         $dialog->setOnChanged(fn() => $this->client->redraw());
+
+        // Cancel and the caption's close box come back through here. The dialog
+        // can hide its own widgets but not its own *window*, so without this the
+        // window stayed mapped, grabbed and modal — a grey box over the
+        // application, with the application still holding a dead modal.
+        $dialog->setOnDismiss(fn(?string $path) => $this->dismiss($dialog, $path));
     }
 
     // -------------------------------------------------------------------------
@@ -109,6 +131,26 @@ final class FileDialogHandler extends WidgetHandler
             return true;
         }
 
+        // Buttons before the drag: a press on the close box must not also start
+        // moving the window.
+        $button = $dialog->hitTestCaptionButton($event->x, $event->y, $this->renderer);
+        if ($button !== null) {
+            // Windows 3.1 closed a dialog by double-clicking the window-menu
+            // box; on that theme it is the only widget the caption has.
+            if ($button === CaptionButton::Menu
+                && $this->doubleClick?->detect($dialog, $event->time, $event->rootX, $event->rootY)) {
+                $dialog->requestClose();
+
+                return true;
+            }
+
+            $this->pressed = $button;
+            $dialog->setPressedButton($button);
+            $this->client->redrawFileDialog();
+
+            return true;
+        }
+
         if ($dialog->hitTestCaption($event->x, $event->y, $this->renderer)) {
             // Offset of the pointer within the window, in root coordinates, so
             // the drag can put the window wherever the pointer goes — including
@@ -129,6 +171,29 @@ final class FileDialogHandler extends WidgetHandler
      */
     public function tryRelease(\Cyrnetix\X11\Event\X11ButtonReleaseEvent $event): bool
     {
+        if ($this->pressed !== null) {
+            $button        = $this->pressed;
+            $this->pressed = null;
+
+            $dialog = $this->find();
+            if ($dialog === null) return true;
+
+            $dialog->setPressedButton(null);
+
+            // Only if the release lands back on the same button — dragging off
+            // one is how you change your mind about pressing it.
+            $over = $dialog->hitTestCaptionButton($event->x, $event->y, $this->renderer);
+            if ($over === $button && $button === CaptionButton::Close) {
+                // The dialog decides what closing means, and points it at the
+                // same call Cancel uses so the two cannot answer differently.
+                $dialog->requestClose();
+            } else {
+                $this->client->redrawFileDialog();
+            }
+
+            return true;
+        }
+
         if ($this->dragOffset === null) return false;
 
         $this->dragOffset = null;
@@ -141,6 +206,23 @@ final class FileDialogHandler extends WidgetHandler
      */
     public function tryMotion(\Cyrnetix\X11\Event\X11MotionEvent $event): bool
     {
+        if ($this->pressed !== null) {
+            $dialog = $this->find();
+            if ($dialog === null) return true;
+
+            // Held down and dragged off the button: show it letting go, and
+            // back again if the pointer returns.
+            $over = $dialog->hitTestCaptionButton($event->x, $event->y, $this->renderer);
+            $want = $over === $this->pressed ? $this->pressed : null;
+
+            if ($dialog->getPressedButton() !== $want) {
+                $dialog->setPressedButton($want);
+                $this->client->redrawFileDialog();
+            }
+
+            return true;
+        }
+
         if ($this->dragOffset === null) return false;
 
         $dialog = $this->find();
@@ -163,8 +245,11 @@ final class FileDialogHandler extends WidgetHandler
         $dialog = $this->find();
         if ($dialog === null || !$dialog->isVisible()) return false;
 
+        // The names come from KeyTranslator::SPECIAL — 'Esc' and 'BS', not
+        // 'Escape' and 'BackSpace'. Guessing them gives a key that silently
+        // does nothing, and both of these did.
         switch ($key) {
-            case 'Escape':
+            case 'Esc':
                 $this->cancel($dialog);
                 return true;
 
@@ -179,7 +264,7 @@ final class FileDialogHandler extends WidgetHandler
                 $this->accept($dialog);
                 return true;
 
-            case 'BackSpace':
+            case 'BS':
                 // Only when the name field isn't where the typing is going.
                 if ($this->tree->getFocused() === $dialog->getNameBox()) return false;
 
@@ -308,12 +393,21 @@ final class FileDialogHandler extends WidgetHandler
         $this->dismiss($dialog, null);
     }
 
-    /** Hand input back to the application, then report the result. */
+    /**
+     * Hand input back to the application, then report the result.
+     *
+     * The only path that closes the dialog, because it is the only one that can:
+     * the widget's own {@see FileDialog::finish()} hides the subtree, and the
+     * three things around it — tree modality, the pointer grab and the window
+     * itself — all belong out here.
+     */
     private function dismiss(FileDialog $dialog, ?string $path): void
     {
         $this->tree->setModal(null);
         $this->tree->setFocused(null);
         $this->dragOffset = null;
+        $this->pressed    = null;
+        $dialog->setPressedButton(null);
         $this->client->hideFileDialogWindow();
 
         // finish() dispatches, so the listener sees a dialog that is already
