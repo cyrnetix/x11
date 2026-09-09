@@ -92,7 +92,9 @@ $logger->pushHandler(new StreamHandler('php://stderr', Level::Warning));
 $themes = new ThemeManager(
     new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme(),
 );
-$themes->select($themeId);
+// "id" or "id:variant".
+[$themeId, $themeVariant] = array_pad(explode(':', $themeId, 2), 2, null);
+$themes->select($themeId, $themeVariant);
 
 $registry = new ListenerRegistry();
 $renderer = new Renderer();

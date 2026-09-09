@@ -34,7 +34,7 @@ final class BeOsTheme extends BaseTheme
     public function name(): string { return 'BeOS R5'; }
 
     /** Builds the palette. */
-    protected function buildPalette(): Palette
+    protected function buildPalette(string $variant): Palette
     {
         $panel   = Palette::hex(0xD8D8D8);
         $control = Palette::hex(0xE8E8E8);

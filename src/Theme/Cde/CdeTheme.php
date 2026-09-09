@@ -29,7 +29,7 @@ final class CdeTheme extends BaseTheme
     public function name(): string { return 'CDE / Motif'; }
 
     /** Builds the palette. */
-    protected function buildPalette(): Palette
+    protected function buildPalette(string $variant): Palette
     {
         $face      = Palette::hex(0xAEB2C3);
         $topShadow = Palette::hex(0xDFDFE0);

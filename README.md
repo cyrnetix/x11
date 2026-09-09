@@ -61,26 +61,57 @@ not be picked up silently. To follow the branch instead of a release, use
 
 ## Themes
 
-Five eras, switchable at runtime. Nothing is re-wired on a switch: painters read
-the live theme per call, so the whole window changes era in place.
+Seven complete looks, and several of them in more than one colour:
 
-| id | era |
-|---|---|
-| `win9x` | Windows 9x / 2000 |
-| `win31` | Windows 3.1x |
-| `platinum` | Mac OS 9 |
-| `cde` | CDE / Motif, the Solaris desktop |
-| `beos` | BeOS R5, including its partial-width yellow window tab |
+| id | look | variants |
+|---|---|---|
+| `win9x` | Windows 9x / 2000 | Standard, Dark, High Contrast |
+| `win31` | Windows 3.1x | Standard, Dark |
+| `platinum` | Mac OS 9 | — |
+| `cde` | CDE / Motif | — |
+| `beos` | BeOS R5 | — |
+| `fluent` | Fluent, Windows 11-style | Light, Dark |
+| `material` | Material | Light, Dark |
 
-A theme is a palette, a set of metrics and a `Chrome` — the drawing primitives,
-expressed as era-neutral *intentions* (`button()`, `well()`, `edge(Edge::Sunken)`,
-`caption()`) rather than as colours. Adding one touches no widget, painter or
-handler.
+```bash
+php example/widget-gallery.php --theme=fluent:dark
+php example/widget-gallery.php --theme=win9x:contrast
+```
 
-The eras genuinely disagree about things it is tempting to assume: whether a
-selection reverses or tints, whether a checkbox sinks or raises, which end of the
-trough the scrollbar arrows live at, whether a dialog has a close box at all. So
-when adjusting a theme, sample the original rather than recalling it.
+A **variant is a palette and nothing else** — deliberately. It changes the
+colours and, through them, the chrome; it does not change the metrics. That is
+what lets a variant switch repaint without relaying anything out: no size moved,
+so nothing needs measuring again. A look that needs different sizes is not a
+variant of an era, it is a different era, and it gets its own theme.
+
+The two legacy eras have variants because they *had* them: both recoloured
+themselves from a control panel, and shipped named schemes to pick from. Those
+particular palettes are this project's own, though — see below.
+
+Everything a theme decides lives in three objects: a `Palette` of colours by
+**role** (`face`, `content`, `selection`, `captionActive`, …), a `Metrics` of
+every size it may move, and a `Chrome` of composite drawing primitives expressed
+as intentions (`button()`, `well()`, `edge(Edge::Sunken)`, `tab()`,
+`caption()`). Painters compute *where* things go and ask the chrome to draw
+them, so adding a theme touches no widget, painter or handler.
+
+`BaseChrome` leaves seven methods abstract — the era-defining ones — and
+implements the rest: `edge()`, `button()`, `checkBox()`, `radioButton()`,
+`tab()`, `scrollThumb()`, `sliderThumb()`.
+
+**On the two modern themes.** The five older ones were measured from screenshots,
+and their comments say where each value came from. The Fluent and Material
+palettes were not: they are chosen to read like those idioms, and they are this
+project's own values. Said plainly because the rest of `src/Theme` sets the
+opposite expectation.
+
+Rounded corners are new with them, and come in two parts because they are two
+mechanisms: `Metrics::$cornerRadius` rounds the controls, drawn through
+`BaseChrome::roundedRect()`, and `Metrics::$windowCornerRadius` rounds the
+window, cut with the SHAPE extension. Both take their curve from the same
+`Corner` table, so the hole cut in the window and the border drawn just inside
+it cannot disagree. A server without SHAPE keeps a square window and everything
+in it still curves.
 
 ## Widgets
 
@@ -162,7 +193,8 @@ server: the ones that check what goes over the wire — `caption_test.php`,
 
 ## Status and limits
 
-**Current release: `v0.2.0`**, which adds the `Canvas` widget — a framebuffer
+**Current release: `v0.2.0`**; the theme variants and the two modern themes
+described above landed after it. It adds the `Canvas` widget — a framebuffer
 the application writes pixels into, blitted with `PutImage` — along with the
 span primitives a software renderer needs, key-release events, and a repaint
 short-circuit that made a frame of thousands of small spans a third cheaper. It

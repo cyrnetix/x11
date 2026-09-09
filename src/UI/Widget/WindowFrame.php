@@ -6,6 +6,7 @@ namespace Cyrnetix\X11\UI\Widget;
 use Cyrnetix\X11\Drawing\Rect;
 use Cyrnetix\X11\Drawing\Renderer;
 use Cyrnetix\X11\Theme\CaptionButton;
+use Cyrnetix\X11\Theme\Corner;
 use Cyrnetix\X11\Theme\CaptionLayout;
 
 /**
@@ -304,15 +305,30 @@ final class WindowFrame extends Widget
         if (!$this->drawsChrome) return [];
 
         $surround = $this->captionSurroundRect($r);
-        if ($surround->isEmpty()) return [];
 
-        $caption = $this->captionRect($r);
-        $body    = $this->bodyRect($r);
+        // A caption that does not span the window leaves a strip beside it, and
+        // that strip is cut away — BeOS's tab. Two rectangles, and no corner
+        // rounding: no era does both.
+        if (!$surround->isEmpty()) {
+            $caption = $this->captionRect($r);
+            $body    = $this->bodyRect($r);
 
-        return [
-            [$caption->x, $caption->y, $caption->width, $caption->height],
-            [$body->x, $body->y, $body->width, $body->height],
-        ];
+            return [
+                [$caption->x, $caption->y, $caption->width, $caption->height],
+                [$body->x, $body->y, $body->width, $body->height],
+            ];
+        }
+
+        // Otherwise the window is a rectangle, unless the era rounds it.
+        $radius = $this->metrics()->windowCornerRadius;
+        if ($radius < 1) return [];
+
+        // A staircase: one rectangle per row of each corner, and one for
+        // everything between them. The curve comes from Corner, which is also
+        // what the chrome draws its own rounded shapes with — so the hole cut in
+        // the window and the border drawn just inside it follow the same arc
+        // rather than two that nearly agree.
+        return Corner::rects(0, 0, $this->width, $this->height, $radius);
     }
 
     // ---- Hit tests ------------------------------------------------------

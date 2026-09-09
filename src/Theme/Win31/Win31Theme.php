@@ -38,8 +38,87 @@ final class Win31Theme extends BaseTheme
     /** The name. */
     public function name(): string { return 'Windows 3.1x'; }
 
+    /**
+     * Its palettes.
+     *
+     * This era recoloured itself from the control panel too, so a second scheme
+     * is in keeping — but this one is mine rather than any that shipped. It is
+     * deliberately spare: 3.1 has no light-grey bevel layer at all (see the
+     * standard palette below), so a dark scheme cannot lean on one either, and
+     * the edges stay a hard two-tone.
+     */
+    public function variants(): array
+    {
+        return ['standard' => 'Standard', 'dark' => 'Dark'];
+    }
+
     /** Builds the palette. */
-    protected function buildPalette(): Palette
+    protected function buildPalette(string $variant): Palette
+    {
+        return $variant === 'dark' ? self::darkPalette() : self::standardPalette();
+    }
+
+    /**
+     * A dark scheme in this era's terms: two tones and no third.
+     *
+     * `faceLight` gets the same value as `faceHighlight`, exactly as the
+     * standard palette does, because anything reaching for a light bevel layer
+     * in 3.1 should get the brightest edge rather than an intermediate one that
+     * the era never drew.
+     */
+    private static function darkPalette(): Palette
+    {
+        $face   = Palette::hex(0x404040);
+        $edge   = Palette::hex(0x707070);
+        $shadow = Palette::hex(0x1A1A1A);
+        $text   = Palette::hex(0xE8E8E8);
+        $white  = Palette::hex(0xFFFFFF);
+        $blue   = Palette::hex(0x2A4A80);
+
+        return new Palette(
+            face:                $face,
+            faceHighlight:       $edge,
+            faceLight:           $edge,
+            faceShadow:          $shadow,
+            faceDarkShadow:      Palette::hex(0x000000),
+            text:                $text,
+            textDisabled:        Palette::hex(0x8C8C8C),
+            textEmboss:          $shadow,
+            textDim:             Palette::hex(0x8C8C8C),
+            content:             Palette::hex(0x202020),
+            contentText:         $text,
+            selection:           $blue,
+            selectionText:       $white,
+            desktop:             Palette::hex(0x141414),
+            bar:                 $face,
+            menuBar:             Palette::hex(0x202020),
+            menu:                Palette::hex(0x202020),
+            menuText:            $text,
+            menuHighlight:       $blue,
+            menuHighlightText:   $white,
+            track:               $face,
+            progressTrough:      $face,
+            progressBar:         $blue,
+            captionActive:       $blue,
+            captionActiveEnd:    $blue,
+            captionActiveText:   $white,
+            // The standard scheme's inactive caption is white with black text,
+            // which is the one thing that cannot carry over: it would be the
+            // brightest thing on screen. Inverted here, and still the odd one
+            // out rather than a dimmed version of the active bar.
+            captionInactive:     Palette::hex(0x202020),
+            captionInactiveEnd:  Palette::hex(0x202020),
+            captionInactiveText: Palette::hex(0x9C9C9C),
+            frame:               Palette::hex(0x000000),
+            focus:               $text,
+            accent:              $blue,
+            tooltip:             Palette::hex(0x202020),
+            tooltipText:         $text,
+        );
+    }
+
+    /** The standard grey scheme. */
+    private static function standardPalette(): Palette
     {
         $black  = [  0,   0,   0];
         $white  = [255, 255, 255];

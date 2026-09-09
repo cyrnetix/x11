@@ -28,6 +28,8 @@ use Cyrnetix\X11\Handler\ConfigureHandler;
 use Cyrnetix\X11\Handler\ExposeHandler;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Fluent\FluentTheme;
+use Cyrnetix\X11\Theme\Material\MaterialTheme;
 use Cyrnetix\X11\Theme\Platinum\PlatinumTheme;
 use Cyrnetix\X11\Theme\ThemeManager;
 use Cyrnetix\X11\Theme\Win9x\Win9xTheme;
@@ -57,8 +59,14 @@ foreach (array_slice($argv, 1) as $arg) {
 $logger = new Logger('form');
 $logger->pushHandler(new StreamHandler('php://stdout', Level::Debug));
 
-$themes = new ThemeManager(new Win9xTheme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme());
-$themes->select($theme);
+$themes = new ThemeManager(
+    new Win9xTheme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme(),
+    new FluentTheme(), new MaterialTheme(),
+);
+
+// "id" or "id:variant".
+[$theme, $themeVariant] = array_pad(explode(':', $theme, 2), 2, null);
+$themes->select($theme, $themeVariant);
 
 $registry = new ListenerRegistry();
 $renderer = new Renderer();

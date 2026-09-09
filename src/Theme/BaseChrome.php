@@ -671,6 +671,70 @@ abstract class BaseChrome implements Chrome
     }
 
     /**
+     * A rounded rectangle, optionally with a one-pixel border.
+     *
+     * Drawn as spans from {@see Corner::rects()}, which is also what shapes a
+     * rounded *window* — so a theme's buttons and its window corners follow the
+     * same arc rather than two that nearly agree.
+     *
+     * The border is done by filling the shape in the border colour and then
+     * filling it again, inset by one and with one less radius, in the fill
+     * colour. That is a little overdraw and a lot less arithmetic than tracing
+     * the outline: a traced curve has to decide which pixel of each step is the
+     * edge, and gets it wrong exactly where the steps change length.
+     *
+     * @param array{int,int,int}      $fill
+     * @param array{int,int,int}|null $border
+     */
+    protected function roundedRect(
+        Renderer $r, Rect $rect, int $radius, array $fill, ?array $border = null,
+    ): void {
+        if ($rect->isEmpty()) return;
+
+        if ($border !== null) {
+            $this->fillRounded($r, $rect, $radius, $border);
+            $this->fillRounded($r, $rect->inset(1), max(0, $radius - 1), $fill);
+
+            return;
+        }
+
+        $this->fillRounded($r, $rect, $radius, $fill);
+    }
+
+    /**
+     * Fill a rounded shape in one colour.
+     *
+     * @param array{int,int,int} $colour
+     */
+    private function fillRounded(Renderer $r, Rect $rect, int $radius, array $colour): void
+    {
+        if ($rect->isEmpty()) return;
+
+        $r->setForeground(...$colour);
+
+        foreach (Corner::rects($rect->x, $rect->y, $rect->width, $rect->height, $radius) as [$x, $y, $w, $h]) {
+            $r->fillRect($x, $y, $w, $h);
+        }
+    }
+
+    /**
+     * Nudge a colour towards this palette's text colour.
+     *
+     * How a flat era expresses a state: a hovered surface moves a little towards
+     * the ink and a pressed one moves further. Towards the *text* rather than
+     * towards black, which is what makes one set of constants work in a light
+     * variant and a dark one — in light the surface darkens, in dark it
+     * lightens, and neither needs to know which it is.
+     *
+     * @param array{int,int,int} $colour
+     * @return array{int,int,int}
+     */
+    protected function towardsText(array $colour, float $amount): array
+    {
+        return Palette::mix($colour, $this->palette->text, $amount);
+    }
+
+    /**
      * Outline in a single colour, inset $inset pixels from $rect.
      *
      * @param array{int,int,int} $color

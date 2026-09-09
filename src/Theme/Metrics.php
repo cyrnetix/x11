@@ -137,6 +137,22 @@ final class Metrics
         public readonly int $upDownWidth  = 16,
         public readonly int $upDownHeight = 18,
 
+        // ---- Rounded corners --------------------------------------------
+        /**
+         * Corner radius for controls a theme rounds — buttons, fields, thumbs.
+         * Zero, the default, means square, which is every era before the 2010s.
+         */
+        public readonly int $cornerRadius = 0,
+        /**
+         * Corner radius of the *window* itself, cut with the SHAPE extension.
+         *
+         * Separate from {@see $cornerRadius} because they are different
+         * mechanisms with different costs: a control's corner is drawn, while a
+         * window's is a hole cut in the window, and a server without SHAPE
+         * cannot have one at all. Zero leaves the window a plain rectangle.
+         */
+        public readonly int $windowCornerRadius = 0,
+
         // ---- Canvas -----------------------------------------------------
         /**
          * Frame a {@see \Cyrnetix\X11\UI\Widget\Canvas} sinks its image behind.

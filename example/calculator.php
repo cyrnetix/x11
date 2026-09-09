@@ -40,6 +40,8 @@ use Cyrnetix\X11\Handler\ConfigureHandler;
 use Cyrnetix\X11\Handler\ExposeHandler;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Fluent\FluentTheme;
+use Cyrnetix\X11\Theme\Material\MaterialTheme;
 use Cyrnetix\X11\Theme\Platinum\PlatinumTheme;
 use Cyrnetix\X11\Theme\ThemeManager;
 use Cyrnetix\X11\Theme\Win31\Win31Theme;
@@ -75,8 +77,13 @@ $logger->pushHandler(new StreamHandler('php://stderr', Level::Warning));
 
 $themes = new ThemeManager(
     new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme(),
+    new FluentTheme(), new MaterialTheme(),
 );
-$themes->select($themeId);
+
+// "id" or "id:variant" — several themes now carry more than one palette, and a
+// dark one is a reasonable thing to ask for on the command line.
+[$themeId, $themeVariant] = array_pad(explode(':', $themeId, 2), 2, null);
+$themes->select($themeId, $themeVariant);
 
 $registry = new ListenerRegistry();
 $renderer = new Renderer();
@@ -210,7 +217,7 @@ $keys = new KeyTranslator();
 
 // The theme order F2 cycles through. Registration order, which is also the order
 // a View menu would offer them in.
-$themeIds = ['win9x', 'win31', 'platinum', 'cde', 'beos'];
+$themeIds = ['win9x', 'win31', 'platinum', 'cde', 'beos', 'fluent', 'material'];
 
 $registry->addListener(
     X11KeyPressEvent::class,
@@ -221,6 +228,17 @@ $registry->addListener(
         // The names are `Esc` and `Del`, not `Escape` and `Delete` — see
         // KeyTranslator::SPECIAL. Guessing gives a key that silently does nothing.
         $name = $keys->translate($e->keycode, $e->state);
+
+        // F3 cycles the current theme's colour variants, where it has any.
+        // Separate from F2 because they are separate choices: the era, and how
+        // it is coloured.
+        if ($name === 'F3' && $themes->selectNextVariant()) {
+            $tree->refreshTheme();
+            $client->applyTheme();
+            $client->redraw();
+
+            return resolve(null);
+        }
 
         if ($name === 'F2') {
             $at = array_search($themes->currentId(), $themeIds, true);

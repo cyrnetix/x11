@@ -47,6 +47,8 @@ use Cyrnetix\X11\Handler\UnmapHandler;
 use Cyrnetix\X11\Logging\ColoredLineFormatter;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Fluent\FluentTheme;
+use Cyrnetix\X11\Theme\Material\MaterialTheme;
 use Cyrnetix\X11\Theme\Platinum\PlatinumTheme;
 use Cyrnetix\X11\Theme\Theme;
 use Cyrnetix\X11\Theme\ThemeManager;
@@ -160,11 +162,17 @@ $themes = new ThemeManager(
     new PlatinumTheme(),
     new CdeTheme(),
     new BeOsTheme(),
+    new FluentTheme(),
+    new MaterialTheme(),
 );
 
-// --theme=<id> (or X11_THEME) picks the starting theme;
+// --theme=<id> or --theme=<id>:<variant> (or X11_THEME) picks the starting
+// look. The variant is optional and separated by a colon — `win9x:dark`,
+// `fluent:light` — because a theme and its colours are one choice to a user
+// even though they are two to the manager.
 // --decorations=wm hands the title bar back to the window manager.
-$requestedTheme = getenv('X11_THEME') ?: null;
+$requestedTheme   = getenv('X11_THEME') ?: null;
+$requestedVariant = null;
 $themedFrame    = (getenv('X11_DECORATIONS') ?: 'theme') !== 'wm';
 $initialTab     = 0;
 $initialPicker  = null;
@@ -188,11 +196,24 @@ foreach (array_slice($argv, 1) as $arg) {
         };
     }
 }
-if ($requestedTheme !== null && !$themes->select($requestedTheme)) {
+if ($requestedTheme !== null) {
+    // "id" or "id:variant". Splitting here rather than in the argument loop
+    // keeps X11_THEME and --theme= on exactly the same footing.
+    [$requestedTheme, $requestedVariant] = array_pad(explode(':', $requestedTheme, 2), 2, null);
+
+    $themes->select($requestedTheme, $requestedVariant);
+
     if (!$themes->has($requestedTheme)) {
         $logger->warning('Unknown theme, keeping the default', [
             'requested' => $requestedTheme,
             'available' => $themes->ids(),
+        ]);
+    } elseif ($requestedVariant !== null && $themes->currentVariant() !== $requestedVariant) {
+        // Selecting is deliberately forgiving about a variant it does not know,
+        // so this is the only place that can tell the user it was ignored.
+        $logger->warning('Unknown variant, using the theme default', [
+            'requested' => $requestedVariant,
+            'available' => array_keys($themes->variants()),
         ]);
     }
 }
@@ -421,17 +442,48 @@ $helpMenu = (new Menu('Help'))
     ->addSeparator()
     ->addItem(new MenuItem('About...',     'F1',     static fn() => $logger->info('Menu: About')));
 
-// View → one item per registered theme. Clicking an item only calls
+// View → one item per registered theme, and for a theme with more than one
+// colour variant, a submenu of those. Clicking an item only calls
 // ThemeManager::select(); the onChange listener registered further down does the
-// relayout + repaint, so nothing here knows how a theme switch is applied.
-$viewMenu   = new Menu('View');
-$themeItems = [];
+// relayout + repaint, so nothing here knows how a switch is applied.
+//
+// The variants hang under their theme rather than in a list of their own
+// because that is the shape of the choice: "Windows 9x, dark" is one decision
+// made in two steps, and a flat menu would have to repeat Dark once per era.
+$viewMenu     = new Menu('View');
+$themeItems   = [];
+$variantItems = [];
+
 foreach ($themes->all() as $themeId => $theme) {
-    $item = new MenuItem(
-        $theme->name(),
-        onClick: static function () use ($themes, $themeId): void { $themes->select($themeId); },
-        checked: $themeId === $themes->currentId(),
-    );
+    $variants = $theme->variants();
+
+    if (count($variants) < 2) {
+        $item = new MenuItem(
+            $theme->name(),
+            onClick: static function () use ($themes, $themeId): void { $themes->select($themeId); },
+            checked: $themeId === $themes->currentId(),
+        );
+        $themeItems[$themeId] = $item;
+        $viewMenu->addItem($item);
+
+        continue;
+    }
+
+    $submenu = new Menu($theme->name());
+    foreach ($variants as $variantId => $variantName) {
+        $variantItem = new MenuItem(
+            $variantName,
+            onClick: static function () use ($themes, $themeId, $variantId): void {
+                $themes->select($themeId, $variantId);
+            },
+            checked: $themeId === $themes->currentId() && $variantId === $themes->currentVariant(),
+        );
+
+        $variantItems[$themeId . ':' . $variantId] = $variantItem;
+        $submenu->addItem($variantItem);
+    }
+
+    $item = new MenuItem($theme->name(), submenu: $submenu, checked: $themeId === $themes->currentId());
     $themeItems[$themeId] = $item;
     $viewMenu->addItem($item);
 }
@@ -1092,23 +1144,38 @@ $registry->addListener(X11ConfigureEvent::class, static function (X11ConfigureEv
 // metrics through the widget tree (so hit-testing and painting agree again),
 // redo the app-level layout, then let the client update the pieces the server
 // holds — window background and font — and repaint.
-$themes->onChange(static function (Theme $theme) use (
-    $themeItems, $widgetTree, $client, $applyLayout, $logger, $fileDialog, $fileDialogHandler
+$themes->onChange(static function (Theme $theme, string $variant, bool $themeChanged) use (
+    $themeItems, $variantItems, $themes, $widgetTree, $client, $applyLayout, $logger, $fileDialog, $fileDialogHandler
 ): void {
     foreach ($themeItems as $id => $item) {
         $item->checked = $id === $theme->id();
     }
+    foreach ($variantItems as $key => $item) {
+        $item->checked = $key === $theme->id() . ':' . $variant;
+    }
 
+    // A variant is colours and nothing else, so it needs the tree re-pushed and
+    // a repaint — but not a relayout, because no size moved. Doing one anyway
+    // would reflow every widget in the window each time someone toggled dark
+    // mode, which is visible work for no change.
     $widgetTree->refreshTheme();
-    $applyLayout($client->getWindowWidth(), $client->getWindowHeight());
 
-    // The file dialog is its own window, so a theme that wants a different
-    // dialog size needs the server told, not just the widget.
-    $fileDialogHandler->refreshLayout($fileDialog);
+    if ($themeChanged) {
+        $applyLayout($client->getWindowWidth(), $client->getWindowHeight());
+
+        // The file dialog is its own window, so a theme that wants a different
+        // dialog size needs the server told, not just the widget.
+        $fileDialogHandler->refreshLayout($fileDialog);
+    }
 
     $client->applyTheme();
 
-    $logger->info('Theme switched', ['theme' => $theme->name(), 'id' => $theme->id()]);
+    $logger->info('Theme switched', [
+        'theme'   => $theme->name(),
+        'id'      => $theme->id(),
+        'variant' => $themes->currentVariantName(),
+        'sizes'   => $themeChanged ? 'relaid out' : 'unchanged',
+    ]);
 });
 
 // Live mouse-coords readout in the status bar's 3rd pane. The existing

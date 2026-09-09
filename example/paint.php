@@ -61,6 +61,8 @@ use Cyrnetix\X11\Handler\ErrorHandler;
 use Cyrnetix\X11\Handler\ExposeHandler;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Fluent\FluentTheme;
+use Cyrnetix\X11\Theme\Material\MaterialTheme;
 use Cyrnetix\X11\Theme\Platinum\PlatinumTheme;
 use Cyrnetix\X11\Theme\ThemeManager;
 use Cyrnetix\X11\Theme\Win31\Win31Theme;
@@ -101,8 +103,12 @@ $logger->pushHandler(new StreamHandler('php://stderr', Level::Warning));
 
 $themes = new ThemeManager(
     new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme(),
+    new FluentTheme(), new MaterialTheme(),
 );
-$themes->select($themeId);
+
+// "id" or "id:variant", so `--theme=fluent:dark` works.
+[$themeId, $themeVariant] = array_pad(explode(':', $themeId, 2), 2, null);
+$themes->select($themeId, $themeVariant);
 
 $registry = new ListenerRegistry();
 $renderer = new Renderer();
@@ -373,7 +379,7 @@ $registry->addListener(
 );
 
 $keys     = new KeyTranslator();
-$themeIds = ['win9x', 'win31', 'platinum', 'cde', 'beos'];
+$themeIds = ['win9x', 'win31', 'platinum', 'cde', 'beos', 'fluent', 'material'];
 
 $registry->addListener(
     X11KeyPressEvent::class,
@@ -383,6 +389,17 @@ $registry->addListener(
     ): PromiseInterface {
         // The names come out of KeyTranslator::SPECIAL — 'Esc', not 'Escape'.
         $name = $keys->translate($event->keycode, $event->state);
+
+        // F3 cycles the current theme's colour variants, where it has any.
+        // Separate from F2 because they are separate choices: the era, and how
+        // it is coloured.
+        if ($name === 'F3' && $themes->selectNextVariant()) {
+            $tree->refreshTheme();
+            $client->applyTheme();
+            $client->redraw();
+
+            return resolve(null);
+        }
 
         if ($name === 'F2') {
             $at = array_search($themes->currentId(), $themeIds, true);

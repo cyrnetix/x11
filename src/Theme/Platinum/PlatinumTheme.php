@@ -40,7 +40,7 @@ final class PlatinumTheme extends BaseTheme
     public function iconSet(): ?string { return 'macos90'; }
 
     /** Builds the palette. */
-    protected function buildPalette(): Palette
+    protected function buildPalette(string $variant): Palette
     {
         $white   = Palette::hex(0xFFFFFF);
         $gray1   = Palette::hex(0xEEEEEE);   // tab panels, scrollbar troughs
