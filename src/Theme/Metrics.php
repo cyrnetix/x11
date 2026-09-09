@@ -211,6 +211,20 @@ final class Metrics
         public readonly int  $captionInnerBottom  = 0,
         /** Gap between the button groups and the title text. */
         public readonly int  $captionTitleGap     = 4,
+        /**
+         * Inset of the title from the caption's own edge, where no button
+         * intervenes.
+         *
+         * Zero, because every era up to now put a button at the leading end — a
+         * window-menu box or a close box — and the title was spaced off *that*
+         * by {@see $captionTitleGap}. A theme with no leading button had its
+         * title flush against the frame, which nobody noticed until one arrived
+         * that has none.
+         *
+         * Applies at both ends, so a centred title stays centred in what is
+         * left.
+         */
+        public readonly int  $captionTitleMargin  = 0,
         public readonly bool $captionTitleCentred = false,
         /**
          * true = the caption is only as wide as its buttons and title, leaving

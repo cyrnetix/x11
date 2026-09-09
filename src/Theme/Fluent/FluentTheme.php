@@ -244,6 +244,9 @@ final class FluentTheme extends BaseTheme
             captionButtonGap:     0,
             captionPadding:       0,
             captionTitleGap:      12,
+            // No leading button, so the title's only spacing from the frame is
+            // this. Without it the text sits flush against the window's edge.
+            captionTitleMargin:   10,
             // A caption control here is a full-height cell that lights up, not
             // a small box inset in the bar — so no padding and no gap.
             captionLeading:       [],

@@ -38,6 +38,9 @@ use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\CaptionButton;
 use Cyrnetix\X11\Theme\CaptionLayout;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Fluent\FluentTheme;
+use Cyrnetix\X11\Theme\Material\MaterialTheme;
+use Cyrnetix\X11\Theme\Metrics;
 use Cyrnetix\X11\Theme\Chrome;
 use Cyrnetix\X11\Theme\Platinum\PlatinumTheme;
 use Cyrnetix\X11\Theme\ThemeManager;
@@ -309,6 +312,60 @@ $check('so the title has the whole caption',
     $form->captionTitleRect($renderer)->width, $form->captionRect($renderer)->width);
 $check('and a press there hits nothing',
     $form->hitTestCaptionButton(300, 8, $renderer), null);
+
+// ---------------------------------------------------------------------------
+// The title's margin from the caption's own edge.
+//
+// Every era up to now put a button at the leading end — a window-menu box or a
+// close box — and the title was spaced off *that*. So nothing held the title off
+// the frame itself, and the first theme to arrive with no leading button drew its
+// title flush against the window's edge. `captionTitleMargin` is that missing
+// spacing, and it defaults to zero so the eras with a button are untouched.
+// ---------------------------------------------------------------------------
+
+$band = static function (Metrics $m) use ($renderer): Rect {
+    $caption = Rect::of(0, 0, 400, 32);
+
+    return CaptionLayout::titleRect(
+        $m,
+        $caption,
+        CaptionLayout::buttons($m, $caption, $m->captionLeading, $m->captionTrailing),
+    );
+};
+
+// With no button at either end, the margin is the only thing positioning the
+// title — so this is the case the bug was in.
+$bare = static fn(int $margin): Metrics => new Metrics(
+    captionTitleMargin: $margin,
+    captionLeading:     [],
+    captionTrailing:    [],
+);
+
+$check('with no buttons and no margin the title is flush', $band($bare(0))->x, 0);
+$check('and a margin holds it off the edge',                $band($bare(10))->x, 10);
+$check('at both ends, so a centred title stays centred',    $band($bare(10))->width, 380);
+
+// A button at that end still decides the inset: it is further in than the
+// margin, and the title has to clear it either way.
+$withButton = new Metrics(
+    captionTitleMargin: 10,
+    captionLeading:     [CaptionButton::Menu],
+    captionTrailing:    [],
+);
+$check('a leading button wins over the margin', $band($withButton)->x > 10, true);
+
+// The eras that shipped before this are unchanged: each takes its inset from its
+// own leading button, exactly as it did.
+foreach ([new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme()] as $era) {
+    $check(sprintf('%s keeps a zero margin', $era->id()), $era->metrics()->captionTitleMargin, 0);
+    $check(sprintf('%s is still inset by its button', $era->id()), $band($era->metrics())->x > 10, true);
+}
+
+// And the two that have no leading button now set one.
+foreach ([new FluentTheme(), new MaterialTheme()] as $modern) {
+    $check(sprintf('%s has no leading button', $modern->id()), $modern->metrics()->captionLeading, []);
+    $check(sprintf('%s holds its title off the edge', $modern->id()), $band($modern->metrics())->x, 10);
+}
 
 echo $fail === 0 ? "all caption assertions passed\n" : "$fail assertions failed\n";
 exit($fail === 0 ? 0 : 1);

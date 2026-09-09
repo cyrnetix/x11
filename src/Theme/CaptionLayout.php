@@ -76,14 +76,22 @@ final class CaptionLayout
      * box at the left and its zoom box at the right (Mac OS 9) has one of each,
      * and the title has to clear both.
      *
+     * Where an end has no button at all, the title is still held off the
+     * caption's edge by {@see Metrics::$captionTitleMargin}. Every era with a
+     * leading button gets its inset from that button instead, which is why the
+     * margin defaults to zero and only the eras without one set it.
+     *
      * @param list<array{CaptionButton, Rect}> $buttons From {@see buttons()}.
      */
     public static function titleRect(Metrics $m, Rect $caption, array $buttons): Rect
     {
         if ($caption->isEmpty()) return $caption;
 
-        $left  = $caption->x;
-        $right = $caption->right();
+        // Start inside the caption's own edge. A theme with a button at this end
+        // will narrow it further below; one without would otherwise put its
+        // title flush against the window frame.
+        $left  = $caption->x + $m->captionTitleMargin;
+        $right = $caption->right() - $m->captionTitleMargin;
 
         foreach ($buttons as [, $rect]) {
             if ($rect->centerX() < $caption->centerX()) {

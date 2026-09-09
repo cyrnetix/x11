@@ -238,6 +238,9 @@ final class MaterialTheme extends BaseTheme
             captionButtonGap:     2,
             captionPadding:       4,
             captionTitleGap:      14,
+            // No leading button, so the title's only spacing from the frame is
+            // this. Without it the text sits flush against the window's edge.
+            captionTitleMargin:   10,
             captionLeading:       [],
             captionTrailing:      [CaptionButton::Minimize, CaptionButton::Maximize, CaptionButton::Close],
             windowBorder:         0,
