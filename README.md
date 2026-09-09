@@ -162,8 +162,11 @@ server: the ones that check what goes over the wire — `caption_test.php`,
 
 ## Status and limits
 
-**Current release: `v0.1.0`.** It works, and it is used for two small
-internal tools of mine — which is a different claim from "production ready". This is a hobby project built with AI
+**Current release: `v0.2.0`**, which adds the `Canvas` widget — a framebuffer
+the application writes pixels into, blitted with `PutImage` — along with the
+span primitives a software renderer needs, key-release events, and a repaint
+short-circuit that made a frame of thousands of small spans a third cheaper. It
+works, and it is used for two small internal tools of mine — which is a different claim from "production ready". This is a hobby project built with AI
 assistance, so treat the API as unstable and read the code before you depend on
 it. The upside of that provenance is that almost every non-obvious decision has a
 comment saying *why*, usually naming the bug that produced it.
