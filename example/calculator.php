@@ -108,7 +108,13 @@ $calc = new Calculator();
 // Not a Label - a Label stores no width and paints no background, and giving one
 // a background means naming a colour, which belongs in src/Theme and nowhere
 // else.
-$display = new TextView(0, 0, 200, 30, $ui, lineHeight: 20);
+//
+// DISPLAY_H is what the display is *asked* for, and not what it gets: TextView
+// has a minimum height of its own, which is why the layout below reads the
+// height back rather than adding this to PAD.
+const DISPLAY_H = 30;
+
+$display = new TextView(0, 0, 200, DISPLAY_H, $ui, lineHeight: 20);
 $display->setText($calc->display());
 $frame->addChild($display);
 
@@ -136,6 +142,13 @@ const PAD  = 8;
 const GAP  = 4;
 const CELL = 28;
 
+/**
+ * Keys whose label is not its own bytes. See the note where a Button is made.
+ *
+ * @var array<string, string> FACES
+ */
+const FACES = ['±' => "\xB1"];
+
 $columns = max(array_map('count', $keys));
 $cellW   = intdiv(240 - 2 * $frame->contentOffsetX() - 2 * PAD - ($columns - 1) * GAP, $columns);
 
@@ -150,7 +163,11 @@ foreach ($keys as $row) {
         $span  = $spans[$c] ?? 1;
         $width = $cellW * $span + GAP * ($span - 1);
 
-        $button = new Button($key, 0, 0, $width, CELL, $ui);
+        // The face, not the key. The core font is iso8859-1, so the UTF-8 '±'
+        // the model compares against drew as the two glyphs "Â±"; the same
+        // reason MessageBoxPainter writes " ..." rather than an ellipsis. Only
+        // the label is translated — the key stays what Calculator knows.
+        $button = new Button(FACES[$key] ?? $key, 0, 0, $width, CELL, $ui);
         // Every button and every key goes through the one press(), so the two
         // input routes cannot mean different things.
         $button->setOnClick(static function () use ($calc, $key, $repaint): void {
@@ -170,9 +187,14 @@ $layout = static function (int $width, int $height) use ($frame, $display, $butt
 
     $display->relX = PAD;
     $display->relY = PAD;
-    $display->setSize(max(60, $inner), 30);
+    $display->setSize(max(60, $inner), DISPLAY_H);
 
-    $top = PAD + 38;
+    // Under the display, by the same margin as everything else — reading the
+    // height the display *took* rather than the one it was given. TextView
+    // clamps to a minimum of 40, so a hardcoded `PAD + 38` here put the first
+    // row of buttons two pixels inside the display's own border, on every
+    // theme that draws one.
+    $top = $display->relY + $display->height + PAD;
     foreach ($keys as $r => $row) {
         $x = PAD;
         foreach ($row as $key) {
