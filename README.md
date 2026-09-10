@@ -193,12 +193,26 @@ server: the ones that check what goes over the wire — `caption_test.php`,
 
 ## Status and limits
 
-**Current release: `v0.2.0`**; the theme variants and the two modern themes
-described above landed after it. It adds the `Canvas` widget — a framebuffer
-the application writes pixels into, blitted with `PutImage` — along with the
-span primitives a software renderer needs, key-release events, and a repaint
-short-circuit that made a frame of thousands of small spans a third cheaper. It
-works, and it is used for two small internal tools of mine — which is a different claim from "production ready". This is a hobby project built with AI
+**Current release: `v0.2.0`.** It adds:
+
+- **Theme colour variants** — a theme may carry several named palettes, and
+  `win9x`, `win31` and both new themes do. A variant is a palette and *nothing
+  else*, so switching one repaints without relaying out.
+- **Two modern themes**, `fluent` and `material`, the first here with no bevels
+  and the first with rounded corners — drawn for controls, and cut with SHAPE
+  for the window.
+- **The `Canvas` widget** — a framebuffer the application writes pixels into,
+  blitted with `PutImage` — along with the span primitives a software renderer
+  needs, key-release events, and a repaint short-circuit that made a frame of
+  thousands of small spans a third cheaper.
+- **A file dialog that closes.** Cancel and the caption's close box went
+  straight to the widget's own `finish()`, which cannot unmap the window,
+  release the pointer grab or clear modality — so cancelling left a grey box
+  over the application and input in a state the app could not recover from.
+  Closing goes through the owner now.
+
+It works, and it is used for two small internal tools of mine — which is a
+different claim from "production ready". This is a hobby project built with AI
 assistance, so treat the API as unstable and read the code before you depend on
 it. The upside of that provenance is that almost every non-obvious decision has a
 comment saying *why*, usually naming the bug that produced it.
