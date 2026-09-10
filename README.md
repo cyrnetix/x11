@@ -36,8 +36,14 @@ Loop::run();
 - A reachable X server. The default socket is `unix:///tmp/.X11-unix/X0`
   (`X11Client::connect()` takes another path). Under WSL2, WSLg provides one.
 
-No PHP extensions beyond the defaults — the ICO and PNG icon decoders are
-written in PHP, so `ext-gd` is not needed either.
+No PHP extensions beyond the defaults. The ICO and PNG icon decoders are
+written in PHP, so nothing has to be installed for icons to work.
+
+`ext-gd` is used for PNG icons **when it happens to be there** — the same icons,
+about eight times faster, because inflating a PNG is 89% of the decode and GD
+does that in C. It is chosen at runtime by a driver chain, so there is nothing
+to configure and nothing to turn off; .ico always goes through the bundled
+parser, since GD cannot read that format at all.
 
 ## Install
 
@@ -192,6 +198,11 @@ server: the ones that check what goes over the wire — `caption_test.php`,
 `canvas_test.php` — write into a fake connection and read the bytes back out.
 
 ## Status and limits
+
+**Unreleased since `v0.2.0`:** icon decoding now goes through a driver chain
+that prefers `ext-gd` and falls back to the bundled parsers, which takes the Mac
+icon set from 824 ms to 102 ms; the file dialog closes properly from Cancel, its
+caption box and Esc; and the calculator's keypad no longer overlaps its display.
 
 **Current release: `v0.2.0`.** It adds:
 

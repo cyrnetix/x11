@@ -23,6 +23,15 @@ use RuntimeException;
  * only pays the decode once each. The format is chosen by file extension, which
  * is what lets one theme use .ico and another .png.
  *
+ * **Decoding goes through a driver chain.** By default that is
+ * {@see DriverIconLoader}, which prefers the GD extension and falls back to this
+ * package's own parsers when it is absent — so a PNG costs ~3.5 ms with GD
+ * installed and ~27 ms without, and nothing in an application has to know which.
+ * The extensions the registry answers to are derived from what the installed
+ * backends actually support rather than listed here, so a build with WebP gets
+ * WebP icons for free and one without PNG in GD still gets PNG through the
+ * native parser.
+ *
  * {@see iconDrawer()} resolves the icon *at draw time* rather than when the
  * closure is made — widgets hold those closures for their whole life
  * (`TreeNode::$iconDrawer`), and they have to follow a theme switch.
@@ -64,11 +73,39 @@ final class IconRegistry
         int                              $iconSize   = 16,
     ) {
         $this->themesRoot = $themesRoot ?? self::shippedThemesRoot();
-        $this->loaders    = $loaders ?? [
-            'ico' => new IcoLoader($iconSize),
-            'png' => new PngLoader($iconSize),
-        ];
+
+        if ($loaders !== null) {
+            $this->loaders = $loaders;
+
+            return;
+        }
+
+        // One loader, registered under every extension the installed drivers
+        // can read. Asking the chain rather than naming formats here is what
+        // keeps the two from disagreeing: a format listed but unreadable is an
+        // icon that silently fails instead of falling through.
+        $chain = new DriverIconLoader(
+            scaler: new IconScaler($iconSize),
+            logger: $this->logger,
+        );
+
+        $map = [];
+        foreach ($chain->available() as $formats) {
+            foreach ($formats as $extension) $map[$extension] = $chain;
+        }
+
+        $this->loaders = $map;
     }
+
+    /**
+     * Which loader handles each extension, for diagnostics.
+     *
+     * "Why are my icons slow" is otherwise invisible, and the answer is usually
+     * that GD is not installed — {@see DriverIconLoader::available()} says so.
+     *
+     * @return array<string, IconLoader>
+     */
+    public function loaders(): array { return $this->loaders; }
 
     /**
      * Where this package's own icon sets live, wherever it has been installed.

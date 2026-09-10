@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Cyrnetix\X11\Drawing;
 
+use Cyrnetix\X11\Drawing\Decoder\RasterImage;
 use RuntimeException;
 
 /**
@@ -12,36 +13,50 @@ use RuntimeException;
  * palette (1/2/4/8-bit) and truecolour-with-alpha, non-interlaced. Everything
  * goes through zlib's inflate and the five PNG scanline filters.
  *
- * Two deliberate transformations happen on load:
- *
- *  - **Box downscale to $preferredSize.** These icons are 64×64 but get drawn at
- *    16px, and nearest-neighbour at 4:1 throws away three quarters of the detail.
- *    Averaging over each source block keeps the artwork readable.
- *  - **Alpha threshold.** X11 core rendering has no alpha blending, so a pixel is
- *    either drawn or skipped. Averaged coverage below the threshold is dropped,
- *    which trims the soft drop shadows Mac icons carry.
+ * **Scaling is not done here.** {@see load()} hands the decoded raster to
+ * {@see IconScaler}, which owns the box downscale and the alpha threshold,
+ * because that policy has to be identical whichever driver read the file — see
+ * {@see \Cyrnetix\X11\Drawing\Decoder\ImageDecoder}. {@see raster()} is the
+ * decode alone, and is what {@see \Cyrnetix\X11\Drawing\Decoder\NativeDecoder}
+ * calls.
  */
 final class PngLoader implements IconLoader
 {
+    /** The policy {@see load()} applies, held rather than made per icon. */
+    private readonly IconScaler $scaler;
+
     /** Records the preferred size. */
     public function __construct(
         public readonly int $preferredSize = 16,
         /** Averaged coverage (0-255) below which a pixel is treated as absent. */
         public readonly int $alphaThreshold = 110,
-    ) {}
+    ) {
+        $this->scaler = new IconScaler($preferredSize, $alphaThreshold);
+    }
 
     /** {@inheritDoc} */
     public function load(string $path): Icon
+    {
+        return $this->scaler->toIcon($this->raster($path));
+    }
+
+    /**
+     * The file's pixels at the size they are stored at, with no policy applied.
+     *
+     * @throws RuntimeException when the file cannot be read or parsed.
+     */
+    public function raster(string $path): RasterImage
     {
         $data = @file_get_contents($path);
         if ($data === false) {
             throw new RuntimeException("Cannot read PNG file: $path");
         }
+
         return $this->parse($data, $path);
     }
 
     /** Reads the PNG signature, IHDR and IDAT chunks and inflates the pixel data. */
-    private function parse(string $data, string $path): Icon
+    private function parse(string $data, string $path): RasterImage
     {
         if (substr($data, 0, 8) !== "\x89PNG\r\n\x1a\n") {
             throw new RuntimeException("Not a PNG: $path");
@@ -101,11 +116,11 @@ final class PngLoader implements IconLoader
             throw new RuntimeException("PNG image data failed to inflate: $path");
         }
 
-        $pixels = $this->unfilter($raw, $width, $height, $depth, $type, $channels, $palette, $path);
-
-        $target = min($this->preferredSize, max($width, $height));
-
-        return new Icon($target, $target, $this->downscale($pixels, $width, $height, $target));
+        return new RasterImage(
+            $width,
+            $height,
+            $this->unfilter($raw, $width, $height, $depth, $type, $channels, $palette, $path),
+        );
     }
 
     /**
@@ -225,54 +240,5 @@ final class PngLoader implements IconLoader
         }
 
         return $row;
-    }
-
-    /**
-     * Average each source block down to one target pixel. Colour is weighted by
-     * coverage so transparent pixels don't wash the edges out, and the averaged
-     * coverage is then thresholded into "drawn" or "not".
-     *
-     * @param list<list<array{int,int,int,int}>> $pixels
-     * @return list<list<array{int,int,int,int}>>
-     */
-    private function downscale(array $pixels, int $width, int $height, int $target): array
-    {
-        $out = [];
-
-        for ($ty = 0; $ty < $target; $ty++) {
-            $y0 = intdiv($ty * $height, $target);
-            $y1 = max($y0 + 1, intdiv(($ty + 1) * $height, $target));
-
-            $row = [];
-            for ($tx = 0; $tx < $target; $tx++) {
-                $x0 = intdiv($tx * $width, $target);
-                $x1 = max($x0 + 1, intdiv(($tx + 1) * $width, $target));
-
-                $r = $g = $b = $a = 0;
-                $samples = 0;
-
-                for ($y = $y0; $y < $y1; $y++) {
-                    for ($x = $x0; $x < $x1; $x++) {
-                        [$pr, $pg, $pb, $pa] = $pixels[$y][$x];
-                        $r += $pr * $pa;
-                        $g += $pg * $pa;
-                        $b += $pb * $pa;
-                        $a += $pa;
-                        $samples++;
-                    }
-                }
-
-                $coverage = intdiv($a, max(1, $samples));
-                if ($a === 0 || $coverage < $this->alphaThreshold) {
-                    $row[] = [0, 0, 0, 0];
-                    continue;
-                }
-
-                $row[] = [intdiv($r, $a), intdiv($g, $a), intdiv($b, $a), 255];
-            }
-            $out[] = $row;
-        }
-
-        return $out;
     }
 }

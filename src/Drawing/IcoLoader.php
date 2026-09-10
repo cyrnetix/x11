@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Cyrnetix\X11\Drawing;
 
+use Cyrnetix\X11\Drawing\Decoder\RasterImage;
+
 /**
  * Parses Windows .ico files into {@see Icon} value objects.
  *
@@ -21,21 +23,50 @@ namespace Cyrnetix\X11\Drawing;
  */
 final class IcoLoader implements IconLoader
 {
+    /**
+     * The policy {@see load()} applies. A pass-through whenever the container
+     * held the size asked for, which every set shipped here does — an .ico's
+     * alpha is already all-or-nothing, so there is nothing for the threshold to
+     * do either.
+     */
+    private readonly IconScaler $scaler;
+
     /** Picks the variant closest to this size, preferring higher bpp on ties. */
-    public function __construct(public readonly int $preferredSize = 16) {}
+    public function __construct(public readonly int $preferredSize = 16)
+    {
+        $this->scaler = new IconScaler($preferredSize);
+    }
 
     /** {@inheritDoc} */
     public function load(string $path): Icon
+    {
+        return $this->scaler->toIcon($this->raster($path, $this->preferredSize));
+    }
+
+    /**
+     * The entry nearest $preferredSize, at its own size, with no policy applied.
+     *
+     * An .ico is a *container*: it already holds the icon at several sizes, so
+     * the right answer is to pick one rather than to scale. That is why this
+     * takes the size as an argument where {@see PngLoader::raster()} does not —
+     * and why running the result through {@see IconScaler} is a pass-through
+     * whenever the container had the size that was asked for, which every set
+     * shipped with this package does.
+     *
+     * @throws \RuntimeException when the file cannot be read or parsed.
+     */
+    public function raster(string $path, int $preferredSize): RasterImage
     {
         $data = @file_get_contents($path);
         if ($data === false) {
             throw new \RuntimeException("Cannot read ICO file: $path");
         }
-        return $this->parse($data, $path);
+
+        return $this->parse($data, $path, $preferredSize);
     }
 
     /** Reads the .ico directory and decodes the entry closest to the size asked for. */
-    private function parse(string $data, string $path): Icon
+    private function parse(string $data, string $path, int $preferredSize): RasterImage
     {
         if (strlen($data) < 6) {
             throw new \RuntimeException("ICO too short: $path");
@@ -61,20 +92,21 @@ final class IcoLoader implements IconLoader
             $entries[] = $e;
         }
 
-        $entry = $this->pickBest($entries);
+        $entry = $this->pickBest($entries, $preferredSize);
+
         return $this->decodeBmpImage($data, $entry, $path);
     }
 
     /**
-     * Pick the entry closest to {@see $preferredSize} (smaller-or-equal
+     * Pick the entry closest to $preferredSize (smaller-or-equal
      * wins ties so we don't scale UP to a smaller-than-icon slot), then
      * highest bpp.
      */
-    private function pickBest(array $entries): array
+    private function pickBest(array $entries, int $preferredSize): array
     {
-        usort($entries, function (array $a, array $b): int {
-            $da = abs($a['width'] - $this->preferredSize);
-            $db = abs($b['width'] - $this->preferredSize);
+        usort($entries, static function (array $a, array $b) use ($preferredSize): int {
+            $da = abs($a['width'] - $preferredSize);
+            $db = abs($b['width'] - $preferredSize);
             if ($da !== $db) return $da <=> $db;
             // Same distance — prefer the smaller side (down-scales less harmful than up).
             if ($a['width'] !== $b['width']) return $a['width'] <=> $b['width'];
@@ -84,7 +116,7 @@ final class IcoLoader implements IconLoader
     }
 
     /** Decodes one BMP-encoded icon image, bottom-up rows and all, into pixels. */
-    private function decodeBmpImage(string $data, array $entry, string $path): Icon
+    private function decodeBmpImage(string $data, array $entry, string $path): RasterImage
     {
         $img = substr($data, $entry['offset'], $entry['size']);
         if (strlen($img) < 40) {
@@ -145,7 +177,7 @@ final class IcoLoader implements IconLoader
             $pixels[] = $line;
         }
 
-        return new Icon($width, $height, $pixels);
+        return new RasterImage($width, $height, $pixels);
     }
 
     /** @return array{int, int, int} */

@@ -22,6 +22,7 @@
         "monolog/monolog": "^3.0"
     },
     "suggest": {
+        "ext-gd": "Decodes PNG icons through GD instead of this package's own parser \u2014 the same icons, ~8x faster (24 ms of a 27 ms decode is inflate-and-unfilter, which GD does in C). Entirely optional: without it the bundled parsers are used, and .ico always goes through them since GD cannot read that format.",
         "react/filesystem": "Non-blocking directory listings for the file dialog and filesystem tree (pass an adapter to DirectoryLister / FilesystemTreeProvider). Only a dev release exists, so requiring it means relaxing minimum-stability; without it both read directories directly."
     },
     "autoload": {
