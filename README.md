@@ -199,7 +199,13 @@ server: the ones that check what goes over the wire — `caption_test.php`,
 
 ## Status and limits
 
-**Current release: `v0.3.0`.** It adds:
+**Current release: `v0.3.1`.** It fixes copy and paste to and from other
+programs (Windows, under WSLg) in every app, not just the gallery. The three
+selection events have to reach `X11Client`, and each app had to register them
+itself; only the gallery did, so everything else could neither copy out nor
+paste in. `WidgetManager::register()` wires them now.
+
+**`v0.3.0`** added:
 
 - **Icon decoding through a driver chain.** The first driver that is present
   and can read the format wins: `ext-gd` when it is installed, the bundled

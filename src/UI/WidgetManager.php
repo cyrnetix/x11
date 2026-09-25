@@ -13,6 +13,9 @@ use Cyrnetix\X11\Event\X11ButtonPressEvent;
 use Cyrnetix\X11\Event\X11ButtonReleaseEvent;
 use Cyrnetix\X11\Event\X11KeyPressEvent;
 use Cyrnetix\X11\Event\X11MotionEvent;
+use Cyrnetix\X11\Event\X11SelectionClearEvent;
+use Cyrnetix\X11\Event\X11SelectionNotifyEvent;
+use Cyrnetix\X11\Event\X11SelectionRequestEvent;
 use Cyrnetix\X11\UI\Handler\TreeViewHandler;
 use Cyrnetix\X11\UI\Handler\WidgetHandler;
 use Cyrnetix\X11\UI\Painter\MessageBoxPainter;
@@ -121,6 +124,17 @@ final class WidgetManager
         $registry->addListener(X11ButtonReleaseEvent::class, $this->onButtonRelease(...));
         $registry->addListener(X11MotionEvent::class,        $this->onMotion(...),    priority: -10);
         $registry->addListener(X11KeyPressEvent::class,      $this->onKeyPress(...),  priority: -10);
+
+        // The clipboard. Ctrl+C/X/V and middle-click paste live here, and they
+        // only work if the selection events reach the client that owns the
+        // selection state: SelectionRequest is how another application (under
+        // WSLg, Windows) asks for what we copied, SelectionNotify is how what
+        // we asked to paste comes back. Each app used to register these three
+        // itself; only the gallery did, so every other app could neither copy
+        // out nor paste in, and nothing said why.
+        $registry->addListener(X11SelectionNotifyEvent::class,  $this->client->onSelectionNotify(...));
+        $registry->addListener(X11SelectionRequestEvent::class, $this->client->onSelectionRequest(...));
+        $registry->addListener(X11SelectionClearEvent::class,   $this->client->onSelectionClear(...));
     }
 
     /**

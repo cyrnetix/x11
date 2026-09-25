@@ -31,9 +31,6 @@ use Cyrnetix\X11\Event\X11FocusOutEvent;
 use Cyrnetix\X11\Event\X11KeyPressEvent;
 use Cyrnetix\X11\Event\X11MapEvent;
 use Cyrnetix\X11\Event\X11MotionEvent;
-use Cyrnetix\X11\Event\X11SelectionClearEvent;
-use Cyrnetix\X11\Event\X11SelectionNotifyEvent;
-use Cyrnetix\X11\Event\X11SelectionRequestEvent;
 use Cyrnetix\X11\Event\X11UnmapEvent;
 use Cyrnetix\X11\Handler\ButtonPressHandler;
 use Cyrnetix\X11\Handler\ConfigureHandler;
@@ -1202,12 +1199,6 @@ $registry->addListener(X11FocusOutEvent::class, static function () use ($windowF
     if ($windowFrame->setActive(false)) $client->redraw();
     return resolve(null);
 });
-
-// Clipboard: the X11Client owns the selection state machine. Route the
-// three selection events at it directly.
-$registry->addListener(X11SelectionNotifyEvent::class,  $client->onSelectionNotify(...));
-$registry->addListener(X11SelectionRequestEvent::class, $client->onSelectionRequest(...));
-$registry->addListener(X11SelectionClearEvent::class,   $client->onSelectionClear(...));
 
 // --- The Canvas tab's animation ---------------------------------------------
 // Twenty frames a second, and only while that tab is on top. The guard is not an
