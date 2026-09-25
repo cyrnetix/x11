@@ -29,6 +29,7 @@ final class TextBox extends Widget implements EditableText, Bounded
     private int    $anchor  = 0;
     private bool   $focused = false;
     private bool   $enabled = true;
+    private ?\Closure $onChanged = null;
 
     /** Takes position, size and the event dispatcher. */
     public function __construct(
@@ -85,12 +86,34 @@ final class TextBox extends Widget implements EditableText, Bounded
     /** The selection end. */
     public function getSelectionEnd(): int   { return max($this->cursor, $this->anchor); }
 
+    /**
+     * Called with the new text whenever the *contents* change — not the caret
+     * or the selection, which {@see TextSelectionChangedEvent} already reports.
+     *
+     * Once per edit, not once per character: a paste of "0x1F" reports one
+     * change, so a listener parsing the field never sees "0x" on the way.
+     * {@see setText()} reports too, when it changes anything, the way
+     * {@see Checkbox::setChecked()} reports a tick set from code — so a
+     * listener that writes back into a field it listens to needs its own guard.
+     *
+     * @see \Cyrnetix\X11\UI\Widget\ListView::setOnSelectionChanged() for why one slot.
+     */
+    public function setOnChanged(?\Closure $cb): void { $this->onChanged = $cb; }
+
     /** Sets text. */
     public function setText(string $text): void
     {
+        $before       = $this->text;
         $this->text   = substr($text, 0, $this->maxLength);
         $this->cursor = strlen($this->text);
         $this->anchor = $this->cursor;
+        $this->fireChangedSince($before);
+    }
+
+    /** Reports a change of contents, if there was one. */
+    private function fireChangedSince(string $before): void
+    {
+        if ($this->onChanged !== null && $this->text !== $before) ($this->onChanged)($this->text);
     }
 
     /** Sets which widget has keyboard focus. Null clears it. */
@@ -138,12 +161,14 @@ final class TextBox extends Widget implements EditableText, Bounded
     public function paste(string $text): void
     {
         if (!$this->enabled) return;
+        $before = $this->text;
         if ($this->hasSelection()) {
             $this->deleteSelection();
         }
         foreach (str_split($text) as $ch) {
             $this->insertPrintable($ch);
         }
+        $this->fireChangedSince($before);
     }
 
     /** {@inheritDoc} */
@@ -217,7 +242,8 @@ final class TextBox extends Widget implements EditableText, Bounded
     {
         if (!$this->enabled) return false;
 
-        return match ($key) {
+        $before  = $this->text;
+        $changed = match ($key) {
             'BS'           => $this->backspace(),
             'Del'          => $this->delete(),
             'Left'         => $this->moveCursor(-1, extend: false),
@@ -230,6 +256,9 @@ final class TextBox extends Widget implements EditableText, Bounded
             'Shift+End'    => $this->moveCaretTo(strlen($this->text), extend: true),
             default        => $this->insertPrintable($key),
         };
+        $this->fireChangedSince($before);
+
+        return $changed;
     }
 
     /** Deletes backward from the caret, or the selection if there is one. True if anything changed. */

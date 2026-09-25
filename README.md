@@ -55,13 +55,13 @@ Not on Packagist, so point Composer at the repository:
         { "type": "vcs", "url": "https://github.com/cyrnetix/x11.git" }
     ],
     "require": {
-        "cyrnetix/x11": "^0.1"
+        "cyrnetix/x11": "^0.3"
     }
 }
 ```
 
-**`0.x` means the API can change under you.** `^0.1` pins you to the `0.1.*`
-line, which is the containment Composer gives a pre-1.0 package — a `0.2.0` will
+**`0.x` means the API can change under you.** `^0.3` pins you to the `0.3.*`
+line, which is the containment Composer gives a pre-1.0 package — a `0.4.0` will
 not be picked up silently. To follow the branch instead of a release, use
 `dev-main`.
 
@@ -199,12 +199,18 @@ server: the ones that check what goes over the wire — `caption_test.php`,
 
 ## Status and limits
 
-**Unreleased since `v0.2.0`:** icon decoding now goes through a driver chain
-that prefers `ext-gd` and falls back to the bundled parsers, which takes the Mac
-icon set from 824 ms to 102 ms; the file dialog closes properly from Cancel, its
-caption box and Esc; and the calculator's keypad no longer overlaps its display.
+**Current release: `v0.3.0`.** It adds:
 
-**Current release: `v0.2.0`.** It adds:
+- **Icon decoding through a driver chain.** The first driver that is present
+  and can read the format wins: `ext-gd` when it is installed, the bundled
+  parsers otherwise, and always for `.ico`, which GD cannot read. The Mac icon
+  set loads in 102 ms instead of 824 ms. GD stays a `suggest`.
+- **`TextBox::setOnChanged()`**, which reports a field's *contents* changing,
+  once per edit — a paste is one change, not one per character. The field had
+  no way to say this before: it reported caret movement only, and not even that
+  for a plain Del.
+
+**`v0.2.0`** added:
 
 - **Theme colour variants** — a theme may carry several named palettes, and
   `win9x`, `win31` and both new themes do. A variant is a palette and *nothing
