@@ -199,7 +199,10 @@ server: the ones that check what goes over the wire — `caption_test.php`,
 
 ## Status and limits
 
-**Current release: `v0.3.1`.** It fixes copy and paste to and from other
+**Current release: `v0.3.2`.** Double-clicking a text field — a `TextBox`, or
+a `ComboBox`'s text area — selects its whole contents.
+
+**`v0.3.1`** fixed copy and paste to and from other
 programs (Windows, under WSLg) in every app, not just the gallery. The three
 selection events have to reach `X11Client`, and each app had to register them
 itself; only the gallery did, so everything else could neither copy out nor

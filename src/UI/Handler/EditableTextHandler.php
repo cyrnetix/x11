@@ -8,6 +8,7 @@ use Cyrnetix\X11\Drawing\Renderer;
 use Cyrnetix\X11\Event\X11ButtonPressEvent;
 use Cyrnetix\X11\Event\X11ButtonReleaseEvent;
 use Cyrnetix\X11\Event\X11MotionEvent;
+use Cyrnetix\X11\UI\DoubleClickDetector;
 use Cyrnetix\X11\UI\Widget\EditableText;
 use Cyrnetix\X11\UI\WidgetTree;
 
@@ -16,7 +17,8 @@ use Cyrnetix\X11\UI\WidgetTree;
  * text area). Driven from the focus block in WidgetManager: after focus
  * is set, this handler runs and — if the focused widget is EditableText —
  * positions the caret and captures the drag. Motion extends the
- * selection until release.
+ * selection until release. A double-click selects the whole text, and
+ * starts no drag, so the pointer drifting before the release can't undo it.
  *
  * Per-key editing (typed characters, arrow caret movement, …) stays on
  * the widget itself via Focusable::handleKey — only the mouse-driven
@@ -31,6 +33,7 @@ final class EditableTextHandler extends WidgetHandler
         private readonly WidgetTree $tree,
         private readonly X11Client  $client,
         private readonly Renderer   $renderer,
+        private readonly DoubleClickDetector $doubleClick = new DoubleClickDetector(),
     ) {}
 
     /**
@@ -44,6 +47,13 @@ final class EditableTextHandler extends WidgetHandler
         $focused = $this->tree->getFocused();
         if (!$focused instanceof EditableText) return false;
         if (!$focused->hitTestForFocus($event->x, $event->y)) return false;
+
+        if ($this->doubleClick->detect($focused, $event->time, $event->x, $event->y)) {
+            $focused->selectAll();
+            $this->dragWidget = null;
+            $this->client->redraw();
+            return true;
+        }
 
         $pos    = $focused->pixelToCursor($event->x, $this->renderer);
         $extend = ($event->state & 0x0001) !== 0;
