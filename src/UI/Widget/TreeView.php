@@ -5,6 +5,7 @@ namespace Cyrnetix\X11\UI\Widget;
 
 use Cyrnetix\X11\Drawing\Rect;
 use Cyrnetix\X11\UI\Event\TreeNodeSelectedEvent;
+use Cyrnetix\X11\UI\Event\TreeSelectionChangedEvent;
 use Cyrnetix\X11\UI\SyncEventDispatcher;
 
 /**
@@ -18,12 +19,30 @@ use Cyrnetix\X11\UI\SyncEventDispatcher;
  *   ├── toggle box [+]/[−]  (treeToggleSize wide, skipped on leaves)
  *   ├── icon                 (optional, drawn by the node's iconDrawer)
  *   └── label
+ *
+ * **Multi-select is opt-in** ({@see setMultiSelect()}), and then follows
+ * Explorer: a plain click selects one row, Ctrl+click adds or removes a row,
+ * Shift+click selects the run of visible rows from the anchor to the one
+ * clicked. {@see getSelected()} stays the one node keyboard navigation moves
+ * from — the most recently picked — and {@see getSelection()} is the whole set.
+ * A tree that never opts in behaves exactly as it did, but still reports
+ * {@see TreeSelectionChangedEvent}, so a listener can be written once.
  */
 final class TreeView extends Widget implements Scrollable, Focusable
 {
     /** @var list<TreeNode> */
     private array $roots = [];
     private ?TreeNode $selected = null;
+    /**
+     * Every selected node, keyed by object id. Always holds {@see $selected}
+     * when that is set; a multi-select tree may hold more.
+     *
+     * @var array<int, TreeNode>
+     */
+    private array     $selection   = [];
+    /** Where a Shift+click range starts: the last row clicked without Shift. */
+    private ?TreeNode $anchor      = null;
+    private bool      $multiSelect = false;
     private bool      $focused  = false;
     private ScrollBar $scrollBar;
 
@@ -100,8 +119,10 @@ final class TreeView extends Widget implements Scrollable, Focusable
      */
     public function clearRoots(): void
     {
-        $this->roots    = [];
-        $this->selected = null;
+        $this->roots     = [];
+        $this->selected  = null;
+        $this->selection = [];
+        $this->anchor    = null;
         $this->scrollBar->setRange(0, 0, $this->getVisibleRowCount());
     }
     /** The selected. */
@@ -154,14 +175,139 @@ final class TreeView extends Widget implements Scrollable, Focusable
      */
     public function setSelected(?TreeNode $node, bool $force = false): bool
     {
-        $changed = $this->selected !== $node;
+        // A plain selection is also a *collapse*: clicking the row that is
+        // already current, while others are selected beside it, has to leave
+        // that row alone, or there is no way back to one row but Ctrl-clicking
+        // every other one off.
+        $changed = $this->selected !== $node || count($this->selection) !== ($node === null ? 0 : 1);
         if (!$changed && !$force) return false;
 
-        $this->selected = $node;
+        $this->selected  = $node;
+        $this->anchor    = $node;
+        $this->selection = $node === null ? [] : [spl_object_id($node) => $node];
         if ($node !== null) {
             $this->dispatcher->dispatch(new TreeNodeSelectedEvent($this, $node));
         }
+        if ($changed) $this->announceSelection();
         return $changed;
+    }
+
+    /** Opt in to Ctrl+click and Shift+click. Turning it off keeps only the current row. */
+    public function setMultiSelect(bool $multiSelect): void
+    {
+        $this->multiSelect = $multiSelect;
+        if (!$multiSelect && count($this->selection) > 1) {
+            $this->setSelected($this->selected);
+        }
+    }
+
+    /** Whether Ctrl+click and Shift+click select more than one row. */
+    public function isMultiSelect(): bool { return $this->multiSelect; }
+
+    /** Whether this node is part of the selection. */
+    public function isSelected(TreeNode $node): bool
+    {
+        return isset($this->selection[spl_object_id($node)]);
+    }
+
+    /**
+     * Every selected node, in the order the rows appear.
+     *
+     * Row order rather than click order, because that is the order the user
+     * reads them in. A node selected and then hidden by collapsing its parent
+     * stays selected — collapsing is looking, not choosing — and follows the
+     * visible ones.
+     *
+     * @return list<TreeNode>
+     */
+    public function getSelection(): array
+    {
+        $left    = $this->selection;
+        $ordered = [];
+        foreach ($this->flattenVisibleRows() as [$node]) {
+            $id = spl_object_id($node);
+            if (!isset($left[$id])) continue;
+            $ordered[] = $node;
+            unset($left[$id]);
+        }
+
+        return [...$ordered, ...array_values($left)];
+    }
+
+    /**
+     * Ctrl+click: add a row to the selection, or take it out.
+     *
+     * Adding makes it the current row. Taking out the current row hands that
+     * role to the most recently picked of the rest, so {@see getSelected()} is
+     * always one of the selected nodes; taking out the last leaves nothing
+     * selected, which is what it looks like. Without multi-select this is a
+     * plain {@see setSelected()}.
+     */
+    public function toggleSelected(TreeNode $node): void
+    {
+        if (!$this->multiSelect) {
+            $this->setSelected($node);
+            return;
+        }
+
+        $id           = spl_object_id($node);
+        $this->anchor = $node;
+
+        if (isset($this->selection[$id])) {
+            unset($this->selection[$id]);
+            if ($this->selected === $node) {
+                $rest           = array_values($this->selection);
+                $this->selected = $rest === [] ? null : $rest[count($rest) - 1];
+            }
+            $this->announceSelection();
+            return;
+        }
+
+        $this->selection[$id] = $node;
+        $this->selected       = $node;
+        $this->dispatcher->dispatch(new TreeNodeSelectedEvent($this, $node));
+        $this->announceSelection();
+    }
+
+    /**
+     * Shift+click: select every visible row from the anchor to this one.
+     *
+     * Replaces the selection, as Explorer does; the anchor stays put, so a
+     * second Shift+click re-draws the run from the same place rather than from
+     * the end of the last one. Without multi-select, or with no anchor yet,
+     * this is a plain {@see setSelected()}.
+     */
+    public function extendSelectionTo(TreeNode $node): void
+    {
+        $anchor = $this->anchor;
+        if (!$this->multiSelect || $anchor === null) {
+            $this->setSelected($node);
+            return;
+        }
+
+        $rows = array_map(static fn(array $row): TreeNode => $row[0], $this->flattenVisibleRows());
+        $from = array_search($anchor, $rows, true);
+        $to   = array_search($node, $rows, true);
+        if ($from === false || $to === false) {
+            $this->setSelected($node);
+            return;
+        }
+
+        $this->selection = [];
+        foreach (array_slice($rows, min($from, $to), abs($to - $from) + 1) as $picked) {
+            $this->selection[spl_object_id($picked)] = $picked;
+        }
+        $this->selected = $node;
+        $this->anchor   = $anchor;
+
+        $this->dispatcher->dispatch(new TreeNodeSelectedEvent($this, $node));
+        $this->announceSelection();
+    }
+
+    /** Tell listeners what the whole selection is now. */
+    private function announceSelection(): void
+    {
+        $this->dispatcher->dispatch(new TreeSelectionChangedEvent($this, $this->getSelection()));
     }
 
     /** Toggles the expanded. */
@@ -207,7 +353,12 @@ final class TreeView extends Widget implements Scrollable, Focusable
     /** {@inheritDoc} */
     public function handleKey(string $key): bool            { return false; }
     /** The copy. */
-    public function copy(): ?string                         { return $this->selected?->label; }
+    public function copy(): ?string
+    {
+        // Every selected label, one per line, the way a list copies its rows.
+        $labels = array_map(static fn(TreeNode $n): string => $n->label, $this->getSelection());
+        return $labels === [] ? null : implode("\n", $labels);
+    }
     /** {@inheritDoc} */
     public function paste(string $text): void               {}
 

@@ -49,9 +49,11 @@ final class DateTimePickerPainter
         $bounds   = $dtp->segmentBounds($r);
         $active   = $dtp->getActiveSegment();
         $hasFocus = $dtp->isFocused();
-        $sep      = ' / ';
+        $sep      = $dtp->getSeparator();
+        $order    = $dtp->getFieldOrder();
+        $last     = $order[count($order) - 1];
 
-        foreach ([DateTimePicker::SEG_MONTH, DateTimePicker::SEG_DAY, DateTimePicker::SEG_YEAR] as $seg) {
+        foreach ($order as $seg) {
             [$sx, $sw] = $bounds[$seg];
 
             // The active segment reads as selected, but only while the picker
@@ -65,7 +67,7 @@ final class DateTimePickerPainter
 
             $chrome->text($r, $dtp->segmentText($seg), $sx, $baseline, $style);
 
-            if ($seg !== DateTimePicker::SEG_YEAR) {
+            if ($seg !== $last) {
                 $chrome->text($r, $sep, $sx + $sw, $baseline, TextStyle::Content);
             }
         }

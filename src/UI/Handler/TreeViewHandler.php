@@ -24,6 +24,10 @@ use Cyrnetix\X11\UI\WidgetTree;
  */
 final class TreeViewHandler extends WidgetHandler
 {
+    /** The core protocol's modifier bits in a button event's `state`. */
+    private const SHIFT_MASK   = 0x0001;
+    private const CONTROL_MASK = 0x0004;
+
     /** Count of in-flight TreeNodeProvider requests — busy cursor while > 0. */
     private int $pendingLoads = 0;
 
@@ -64,13 +68,26 @@ final class TreeViewHandler extends WidgetHandler
                 $this->loadChildren($tv, $node);
             }
         } else {
-            // Row label click: select + browse.
-            $tv->setSelected($node);
+            // Row label click: select + browse. With multi-select on, the
+            // modifiers decide how: Shift extends from the anchor, Ctrl adds or
+            // removes one row, neither starts again from this one.
+            $extend = $tv->isMultiSelect() && ($event->state & self::SHIFT_MASK) !== 0;
+            $toggle = $tv->isMultiSelect() && !$extend && ($event->state & self::CONTROL_MASK) !== 0;
+
+            if ($extend) {
+                $tv->extendSelectionTo($node);
+            } elseif ($toggle) {
+                $tv->toggleSelected($node);
+            } else {
+                $tv->setSelected($node);
+            }
             if (!$node->loaded && !$node->loading && $tv->getProvider() !== null) {
                 $this->loadChildren($tv, $node);
             }
-            // Double-click on a label toggles expansion (Explorer style).
-            if ($this->doubleClick->detect($node, $event->time, $event->x, $event->y)
+            // Double-click on a label toggles expansion (Explorer style). Not
+            // for a modified click: two quick Ctrl+clicks are picking rows.
+            if (!$extend && !$toggle
+                && $this->doubleClick->detect($node, $event->time, $event->x, $event->y)
                 && !$node->isLeaf()) {
                 $tv->toggleExpanded($node);
                 if ($node->expanded && !$node->loaded && !$node->loading
@@ -235,7 +252,11 @@ final class TreeViewHandler extends WidgetHandler
             // Match Explorer's "expand also selects" — gives listeners
             // (e.g. the ListView) a TreeNodeSelectedEvent to react to
             // without the user needing a second click on the row label.
-            $tv->setSelected($node, force: true);
+            // Except over a multi-selection: a folder finishing its load is
+            // not a reason to throw away the rows someone Ctrl-clicked.
+            if (count($tv->getSelection()) <= 1) {
+                $tv->setSelected($node, force: true);
+            }
 
             $this->pendingLoads--;
             if ($this->pendingLoads === 0) {

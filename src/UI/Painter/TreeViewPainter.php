@@ -46,7 +46,6 @@ final class TreeViewPainter
         $rows        = $tv->flattenVisibleRows();
         $scroll      = $tv->getScrollBar()->getValue();
         $visible     = $tv->getVisibleRowCount();
-        $selectedRef = $tv->getSelected();
 
         for ($i = 0; $i < $visible; $i++) {
             $rowIdx = $scroll + $i;
@@ -61,7 +60,7 @@ final class TreeViewPainter
                 $m->treeRowHeight,
             );
 
-            $isSelected = $node === $selectedRef;
+            $isSelected = $tv->isSelected($node);
             if ($isSelected) {
                 $chrome->fill($r, $row, Surface::Selection);
                 $style = TextStyle::Selected;

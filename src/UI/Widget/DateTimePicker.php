@@ -41,6 +41,13 @@ final class DateTimePicker extends Widget implements Focusable
     public const SEG_DAY   = 1;
     public const SEG_YEAR  = 2;
 
+    /** Month, day, year — the Win32 control's own order, and the default. */
+    public const ORDER_US       = [self::SEG_MONTH, self::SEG_DAY, self::SEG_YEAR];
+    /** Day, month, year — most of Europe. */
+    public const ORDER_EUROPEAN = [self::SEG_DAY, self::SEG_MONTH, self::SEG_YEAR];
+    /** Year, month, day — ISO 8601, which no reader mistakes for another order. */
+    public const ORDER_ISO      = [self::SEG_YEAR, self::SEG_MONTH, self::SEG_DAY];
+
     public const MIN_YEAR = 1900;
     public const MAX_YEAR = 2100;
 
@@ -52,6 +59,9 @@ final class DateTimePicker extends Widget implements Focusable
     private DateTimeImmutable $viewMonth;
 
     private int     $activeSegment = self::SEG_MONTH;
+    /** @var list<int> The segments left to right. */
+    private array   $order         = self::ORDER_US;
+    private string  $separator     = ' / ';
     private bool    $open          = false;
     private bool    $focused       = false;
     /** Which calendar nav button is currently pressed: null | 'prev' | 'next'. */
@@ -116,10 +126,49 @@ final class DateTimePicker extends Widget implements Focusable
         $this->resetTypeBuffer();
     }
 
-    /** Moves editing to the next field - day, month, year, hour. */
-    public function nextSegment(): void { $this->setActiveSegment($this->activeSegment + 1); }
-    /** Moves editing to the previous field. */
-    public function prevSegment(): void { $this->setActiveSegment($this->activeSegment - 1); }
+    /**
+     * Which order the segments read in, and what goes between them.
+     *
+     * "10 / 07 / 2026" is the seventh of October in the default US order and
+     * the tenth of July to most of Europe, and nothing in the field says which
+     * — so an application whose readers are not American should say. Keyboard
+     * movement and typing follow the order: Right goes to the segment that is
+     * *shown* next, and a filled segment advances to it.
+     *
+     * @param list<int> $order One of the ORDER_* constants, or any arrangement
+     *        of the three SEG_* values.
+     */
+    public function setFieldOrder(array $order, string $separator = ' / '): void
+    {
+        $sorted = $order;
+        sort($sorted);
+        if ($sorted !== [self::SEG_MONTH, self::SEG_DAY, self::SEG_YEAR]) {
+            throw new \InvalidArgumentException('A field order names each of month, day and year once.');
+        }
+
+        $this->order         = array_values($order);
+        $this->separator     = $separator;
+        $this->activeSegment = $this->order[0];
+        $this->resetTypeBuffer();
+    }
+
+    /** @return list<int> The segments left to right. */
+    public function getFieldOrder(): array { return $this->order; }
+
+    /** What is drawn between two segments. */
+    public function getSeparator(): string { return $this->separator; }
+
+    /** Moves editing to the segment shown to the right of this one. */
+    public function nextSegment(): void { $this->moveSegment(1); }
+    /** Moves editing to the segment shown to the left of this one. */
+    public function prevSegment(): void { $this->moveSegment(-1); }
+
+    /** Steps through the segments in the order they are shown, stopping at either end. */
+    private function moveSegment(int $by): void
+    {
+        $at = (int) array_search($this->activeSegment, $this->order, true);
+        $this->setActiveSegment($this->order[max(0, min(2, $at + $by))]);
+    }
 
     // ---- Editing --------------------------------------------------------
 
@@ -183,7 +232,7 @@ final class DateTimePicker extends Widget implements Focusable
 
         if ($this->typeCount >= $maxDigits || $cannotExtend) {
             $this->resetTypeBuffer();
-            if ($this->activeSegment !== self::SEG_YEAR) {
+            if ($this->activeSegment !== $this->order[2]) {
                 $this->nextSegment();
             }
         }
@@ -312,13 +361,12 @@ final class DateTimePicker extends Widget implements Focusable
      */
     public function segmentBounds(Renderer $r): array
     {
-        $sep   = ' / ';
-        $sepW  = $r->measureText($sep);
+        $sepW  = $r->measureText($this->separator);
         $x0    = $this->x + $this->metrics()->datePickerPadding;
 
         $bounds = [];
         $cursor = $x0;
-        foreach ([self::SEG_MONTH, self::SEG_DAY, self::SEG_YEAR] as $seg) {
+        foreach ($this->order as $seg) {
             $text = $this->segmentText($seg);
             $w    = max($r->measureText($text), $r->measureText(str_repeat('0', strlen($text))));
             $bounds[$seg] = [$cursor, $w];

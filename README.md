@@ -199,8 +199,15 @@ server: the ones that check what goes over the wire — `caption_test.php`,
 
 ## Status and limits
 
-**Current release: `v0.3.2`.** Double-clicking a text field — a `TextBox`, or
-a `ComboBox`'s text area — selects its whole contents.
+**Current release: `v0.3.3`.** A `TreeView` can select more than one row:
+`setMultiSelect(true)` turns on Ctrl+click to add or remove a row and
+Shift+click to select a run. `getSelection()` returns the set, and
+`TreeSelectionChangedEvent` reports every change to it, including a row
+Ctrl-clicked away. `DateTimePicker::setFieldOrder()` shows the date
+year-first (`ORDER_ISO`) or day-first (`ORDER_EUROPEAN`) instead of month-first.
+
+**`v0.3.2`**: double-clicking a text field — a `TextBox`, or a `ComboBox`'s
+text area — selects its whole contents.
 
 **`v0.3.1`** fixed copy and paste to and from other
 programs (Windows, under WSLg) in every app, not just the gallery. The three
