@@ -39,7 +39,7 @@ final class WindowFramePainter
         // The border frames the *body*: with a tab caption nothing is drawn above
         // or beside the tab, which is what makes it read as part of the outline
         // rather than as something sitting inside a full-width frame.
-        $chrome->windowBorder($r, $frame->bodyRect($r));
+        $chrome->windowBorder($r, $frame->bodyRect($r), $active);
         $chrome->clientEdge($r, $frame->contentRect());
 
         // A caption that only spans part of the top edge (BeOS's tab) leaves a

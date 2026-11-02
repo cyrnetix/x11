@@ -44,6 +44,7 @@ use Cyrnetix\X11\Handler\ConfigureHandler;
 use Cyrnetix\X11\Handler\ExposeHandler;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Solaris9\Solaris9Theme;
 use Cyrnetix\X11\Theme\Platinum\PlatinumTheme;
 use Cyrnetix\X11\Theme\ThemeManager;
 use Cyrnetix\X11\Theme\Win31\Win31Theme;
@@ -90,7 +91,7 @@ $logger = new Logger('todo');
 $logger->pushHandler(new StreamHandler('php://stderr', Level::Warning));
 
 $themes = new ThemeManager(
-    new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme(),
+    new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new Solaris9Theme(), new BeOsTheme(),
 );
 // "id" or "id:variant".
 [$themeId, $themeVariant] = array_pad(explode(':', $themeId, 2), 2, null);

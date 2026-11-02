@@ -98,7 +98,8 @@ final class TreeViewPainter
             }
 
             // Trailing ellipsis while the provider is still fetching children.
-            $label = $node->loading ? $node->label . ' …' : $node->label;
+            // Three dots: the core fonts are iso8859-1 and have no glyph for U+2026.
+            $label = $node->loading ? $node->label . ' ...' : $node->label;
             $label = TextClip::toWidth($label, $row->right() - $cursorX - 1, $r);
 
             $chrome->text($r, $label, $cursorX, $r->baselineYForRect($row->y, $row->height), $style);

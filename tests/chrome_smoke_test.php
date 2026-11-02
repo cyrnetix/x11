@@ -25,6 +25,7 @@ use Cyrnetix\X11\Drawing\Renderer;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\CaptionButton;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Solaris9\Solaris9Theme;
 use Cyrnetix\X11\Theme\Chrome;
 use Cyrnetix\X11\Theme\ControlState;
 use Cyrnetix\X11\Theme\Direction;
@@ -176,7 +177,7 @@ $sizes = [
 
 /** @var list<Theme> $themes */
 $themes = [
-    new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme(),
+    new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new Solaris9Theme(), new BeOsTheme(),
     new FluentTheme(), new MaterialTheme(),
 ];
 

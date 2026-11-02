@@ -28,6 +28,7 @@ use Cyrnetix\X11\Handler\ConfigureHandler;
 use Cyrnetix\X11\Handler\ExposeHandler;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Solaris9\Solaris9Theme;
 use Cyrnetix\X11\Theme\Fluent\FluentTheme;
 use Cyrnetix\X11\Theme\Material\MaterialTheme;
 use Cyrnetix\X11\Theme\Platinum\PlatinumTheme;
@@ -60,7 +61,7 @@ $logger = new Logger('form');
 $logger->pushHandler(new StreamHandler('php://stdout', Level::Debug));
 
 $themes = new ThemeManager(
-    new Win9xTheme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme(),
+    new Win9xTheme(), new PlatinumTheme(), new CdeTheme(), new Solaris9Theme(), new BeOsTheme(),
     new FluentTheme(), new MaterialTheme(),
 );
 
@@ -75,7 +76,7 @@ $ui       = new SyncEventDispatcher($uiRegistry = new ListenerRegistry());
 
 $tree  = new WidgetTree($themes);
 $frame = new WindowFrame(420, 240, 'Child Window Demo', drawsChrome: true);
-$open  = new Button('Open form…', 20, 20, 110, $themes->metrics()->dialogButtonHeight, $ui);
+$open  = new Button('Open form...', 20, 20, 110, $themes->metrics()->dialogButtonHeight, $ui);
 $shown = new Label('Nothing entered yet', 20, 60);
 $frame->addChild($open);
 $frame->addChild($shown);

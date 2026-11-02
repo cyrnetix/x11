@@ -755,7 +755,7 @@ final class PlatinumChrome extends BaseChrome
      * black, white, the caption grey, a #999999 rule, then black again around
      * the content.
      */
-    public function windowBorder(Renderer $r, Rect $rect): void
+    public function windowBorder(Renderer $r, Rect $rect, bool $active = true): void
     {
         $t = $this->metrics->windowBorder;
         if ($t <= 0) return;

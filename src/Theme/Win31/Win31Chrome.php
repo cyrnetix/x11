@@ -442,7 +442,7 @@ final class Win31Chrome extends BaseChrome
      * as 000000 / C0C0C0 C0C0C0 / 000000. Both lines matter: without the inner
      * one the caption bleeds into the frame.
      */
-    public function windowBorder(Renderer $r, Rect $rect): void
+    public function windowBorder(Renderer $r, Rect $rect, bool $active = true): void
     {
         $t = $this->metrics->windowBorder;
         if ($t <= 0) return;

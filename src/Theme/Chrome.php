@@ -117,6 +117,18 @@ interface Chrome
     /** Draws the box that rides a scrollbar's trough. */
     public function scrollThumb(Renderer $r, Rect $rect, bool $horizontal): void;
 
+    /**
+     * The arrow at one end of a scrollbar, in the square the bar reserves for
+     * it. $state is Pressed while the pointer holds it down and Disabled when
+     * the content fits and there is nothing to scroll to.
+     *
+     * Windows and Mac OS draw a button with an arrow on it; Motif draws a
+     * bevelled triangle *in the trough*, with no button at all. The default
+     * here is the former, so a theme that has nothing to say about it keeps
+     * what it had.
+     */
+    public function scrollArrow(Renderer $r, Rect $rect, Direction $direction, ControlState $state): void;
+
     /** Groove a slider's thumb rides along. */
     public function sliderTrack(Renderer $r, Rect $rect, bool $horizontal): void;
 
@@ -206,8 +218,12 @@ interface Chrome
     /**
      * The resize border around the whole window, drawn as a ring so the client
      * area inside it is left untouched.
+     *
+     * $active says whether the window has the focus. Most eras colour only the
+     * caption by that, but dtwm paints the *whole* frame in the active colour,
+     * so the border has to be told too.
      */
-    public function windowBorder(Renderer $r, Rect $rect): void;
+    public function windowBorder(Renderer $r, Rect $rect, bool $active = true): void;
 
     /**
      * Frame drawn just outside the client area, between it and the window

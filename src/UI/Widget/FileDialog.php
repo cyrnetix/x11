@@ -730,7 +730,7 @@ final class FileDialog extends FormWindow
         $btnH    = $m->dialogButtonHeight;
         $navW    = $m->fileDialogNavWidth;
         $innerW  = max(80, $this->width  - 2 * $this->contentOffsetX());
-        $innerH  = max(80, $this->height - $this->contentOffsetY() - $m->edge - $m->fileDialogPadding);
+        $innerH  = max(80, $this->height - $this->contentOffsetY() - $m->dialogBorder() - $m->fileDialogPadding);
 
         // ---- Nav row -----------------------------------------------------
         $this->upButton->relX   = 0;

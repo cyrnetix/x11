@@ -14,7 +14,7 @@ Unix-domain socket, assembling every request with `pack()` and parsing the
 event loop, so the window stays responsive while it waits on socket data, reply
 futures and timers.
 
-It ships a widget toolkit and five complete themes, transcribed pixel by pixel
+It ships a widget toolkit and six complete themes, transcribed pixel by pixel
 from real screenshots rather than approximated.
 
 ```php
@@ -55,19 +55,19 @@ Not on Packagist, so point Composer at the repository:
         { "type": "vcs", "url": "https://github.com/cyrnetix/x11.git" }
     ],
     "require": {
-        "cyrnetix/x11": "^0.3"
+        "cyrnetix/x11": "^0.4"
     }
 }
 ```
 
-**`0.x` means the API can change under you.** `^0.3` pins you to the `0.3.*`
-line, which is the containment Composer gives a pre-1.0 package — a `0.4.0` will
+**`0.x` means the API can change under you.** `^0.4` pins you to the `0.4.*`
+line, which is the containment Composer gives a pre-1.0 package — a `0.5.0` will
 not be picked up silently. To follow the branch instead of a release, use
 `dev-main`.
 
 ## Themes
 
-Seven complete looks, and several of them in more than one colour:
+Eight complete looks, and several of them in more than one colour:
 
 | id | look | variants |
 |---|---|---|
@@ -75,6 +75,7 @@ Seven complete looks, and several of them in more than one colour:
 | `win31` | Windows 3.1x | Standard, Dark |
 | `platinum` | Mac OS 9 | — |
 | `cde` | CDE / Motif | — |
+| `solaris9` | Solaris 9: CDE 1.5 under dtwm, in Sun's default palette | — |
 | `beos` | BeOS R5 | — |
 | `fluent` | Fluent, Windows 11-style | Light, Dark |
 | `material` | Material | Light, Dark |
@@ -105,7 +106,7 @@ them, so adding a theme touches no widget, painter or handler.
 implements the rest: `edge()`, `button()`, `checkBox()`, `radioButton()`,
 `tab()`, `scrollThumb()`, `sliderThumb()`.
 
-**On the two modern themes.** The five older ones were measured from screenshots,
+**On the two modern themes.** The six older ones were measured from screenshots,
 and their comments say where each value came from. The Fluent and Material
 palettes were not: they are chosen to read like those idioms, and they are this
 project's own values. Said plainly because the rest of `src/Theme` sets the
@@ -155,7 +156,7 @@ php example/calculator.php                # a button grid, the keyboard, F2 to c
 php example/todo.php                      # the open/save dialogs, a menu bar, a checkable list
 php example/paint.php                     # a canvas: tools, undo, a palette that is a canvas
 php example/child-window.php --open-form  # a form in its own top-level window
-php example/widget-gallery.php            # the kitchen sink: every widget, all five themes
+php example/widget-gallery.php            # the kitchen sink: every widget, every theme
 ```
 
 Every one takes `--theme=<id>`. `widget-gallery.php` also takes `--tab=N`,

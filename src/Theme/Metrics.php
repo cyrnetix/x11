@@ -291,7 +291,26 @@ final class Metrics
         public readonly int $arrowSize      = 4,
         /** Rows/columns in a compact arrow (sort indicators, spinners). */
         public readonly int $smallArrowSize = 3,
+
+        // ---- Dialog frame ------------------------------------------------
+        /**
+         * Thickness of the frame a dialog — a form, the file picker, a message
+         * box — draws around itself, which is what those windows inset their
+         * caption and content by. Null means {@see $edge}, which is what every
+         * theme before Solaris 9 relied on: Windows 3.1 even set `edge` to 5 to
+         * get its thick dialog band. A theme whose dialog frame is a window
+         * frame (dtwm puts the same 5 px around a dialog as around a window)
+         * while its bevels stay one pixel says so here, through
+         * {@see dialogBorder()}.
+         */
+        public readonly ?int $dialogBorder = null,
     ) {}
+
+    /** What a dialog insets its caption and content by: {@see $dialogBorder}, else {@see $edge}. */
+    public function dialogBorder(): int
+    {
+        return $this->dialogBorder ?? $this->edge;
+    }
 
     /**
      * Width a tab-style caption wants: its padding, buttons, and the title.

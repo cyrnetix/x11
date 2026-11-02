@@ -484,7 +484,7 @@ final class BeOsChrome extends BaseChrome
     }
 
     /** #9A9A9A, white, panel, then a grey line against the client area. */
-    public function windowBorder(Renderer $r, Rect $rect): void
+    public function windowBorder(Renderer $r, Rect $rect, bool $active = true): void
     {
         $t = $this->metrics->windowBorder;
         if ($t <= 0) return;

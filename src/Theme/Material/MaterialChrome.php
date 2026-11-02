@@ -339,7 +339,7 @@ final class MaterialChrome extends BaseChrome
     }
 
     /** No border at all: the window is a surface, and the desktop shows around it. */
-    public function windowBorder(Renderer $r, Rect $rect): void {}
+    public function windowBorder(Renderer $r, Rect $rect, bool $active = true): void {}
 
     /** {@inheritDoc} */
     public function dialogFrame(Renderer $r, Rect $rect): void

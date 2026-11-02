@@ -96,7 +96,7 @@ class FormWindow extends Widget
     /** The content offset X. */
     public function contentOffsetX(): int
     {
-        return $this->metrics()->edge + $this->contentPadding();
+        return $this->metrics()->dialogBorder() + $this->contentPadding();
     }
 
     /** The content offset Y. */
@@ -134,8 +134,8 @@ class FormWindow extends Widget
         $m = $this->metrics();
 
         return $m->captionFitsTitle
-            ? $this->bodyTop() + $m->edge
-            : $m->edge + $this->captionH();
+            ? $this->bodyTop() + $m->dialogBorder()
+            : $m->dialogBorder() + $this->captionH();
     }
 
     /**
@@ -148,7 +148,9 @@ class FormWindow extends Widget
         $wanted = $m->captionTabWidth($r->measureText($this->title), 0);
 
         if ($wanted === 0) {
-            return Rect::of($m->edge, $m->edge, max(0, $this->width - 2 * $m->edge), $this->captionH());
+            $b = $m->dialogBorder();
+
+            return Rect::of($b, $b, max(0, $this->width - 2 * $b), $this->captionH());
         }
 
         return Rect::of(0, 0, min($this->width, max(40, $wanted)), $this->captionH());

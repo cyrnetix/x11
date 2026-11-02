@@ -302,9 +302,9 @@ final class CdeChrome extends BaseChrome
     }
 
     /** Motif frames carry visible corner handles, delimited by shadow lines. */
-    public function windowBorder(Renderer $r, Rect $rect): void
+    public function windowBorder(Renderer $r, Rect $rect, bool $active = true): void
     {
-        parent::windowBorder($r, $rect);
+        parent::windowBorder($r, $rect, $active);
 
         $corner = $this->metrics->windowResizeCorner;
         $t      = $this->metrics->windowBorder;

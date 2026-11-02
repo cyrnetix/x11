@@ -65,7 +65,9 @@ final class MessageBox
         $wanted = $m->captionTabWidth($r->measureText($this->title), 0);
 
         if ($wanted === 0) {
-            return Rect::of($m->edge, $m->edge, self::WIDTH - 2 * $m->edge, $height);
+            $b = $m->dialogBorder();
+
+            return Rect::of($b, $b, self::WIDTH - 2 * $b, $height);
         }
 
         return Rect::of(0, 0, min(self::WIDTH, max(40, $wanted)), $height);

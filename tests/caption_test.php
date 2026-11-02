@@ -38,6 +38,7 @@ use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\CaptionButton;
 use Cyrnetix\X11\Theme\CaptionLayout;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Solaris9\Solaris9Theme;
 use Cyrnetix\X11\Theme\Fluent\FluentTheme;
 use Cyrnetix\X11\Theme\Material\MaterialTheme;
 use Cyrnetix\X11\Theme\Metrics;
@@ -173,7 +174,7 @@ echo "registration\n";
 // ---- there is only one way to draw a caption ----------------------------
 echo "one path\n";
 $check('Chrome has no titleBar()',       method_exists(Chrome::class, 'titleBar'), false);
-foreach ([new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme()] as $theme) {
+foreach ([new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new Solaris9Theme(), new BeOsTheme()] as $theme) {
     $check("  {$theme->id()}: nor does its chrome",
         method_exists($theme->chrome(), 'titleBar'), false);
 }
@@ -182,10 +183,10 @@ foreach ([new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(
 // Same metrics, same caption, same button lists: the two windows cannot place
 // them differently, because there is one function that does it.
 echo "shared placement\n";
-$themes = new ThemeManager(new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme());
+$themes = new ThemeManager(new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new Solaris9Theme(), new BeOsTheme());
 $renderer = new Renderer();
 
-foreach (['win9x', 'win31', 'platinum', 'cde', 'beos'] as $id) {
+foreach (['win9x', 'win31', 'platinum', 'cde', 'solaris9', 'beos'] as $id) {
     $themes->select($id);
     $m       = $themes->metrics();
     $caption = Rect::of(4, 4, 300, $m->dialogTitleHeight);
@@ -235,7 +236,7 @@ foreach (['win9x', 'win31', 'platinum', 'cde', 'beos'] as $id) {
 // byte-identical to the theme's own caption() over the same rectangle. A
 // hand-rolled gradient would not match.
 echo "the same pixels\n";
-foreach (['win9x', 'win31', 'platinum', 'cde', 'beos'] as $id) {
+foreach (['win9x', 'win31', 'platinum', 'cde', 'solaris9', 'beos'] as $id) {
     $themes->select($id);
     $tree = new WidgetTree($themes);
 
@@ -356,7 +357,7 @@ $check('a leading button wins over the margin', $band($withButton)->x > 10, true
 
 // The eras that shipped before this are unchanged: each takes its inset from its
 // own leading button, exactly as it did.
-foreach ([new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme()] as $era) {
+foreach ([new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new Solaris9Theme(), new BeOsTheme()] as $era) {
     $check(sprintf('%s keeps a zero margin', $era->id()), $era->metrics()->captionTitleMargin, 0);
     $check(sprintf('%s is still inset by its button', $era->id()), $band($era->metrics())->x > 10, true);
 }

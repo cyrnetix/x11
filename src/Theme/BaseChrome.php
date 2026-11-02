@@ -174,6 +174,24 @@ abstract class BaseChrome implements Chrome
         $this->fill($r, $rect, Surface::Track);
     }
 
+    /**
+     * A button carrying an arrow, which is how every era but Motif drew it.
+     * Byte for byte what {@see \Cyrnetix\X11\UI\Painter\ScrollBarPainter} used
+     * to do itself, so the themes that do not override this are unchanged.
+     */
+    public function scrollArrow(Renderer $r, Rect $rect, Direction $direction, ControlState $state): void
+    {
+        $this->button($r, $rect, $state);
+
+        $shift = $state->isPressed() ? $this->metrics->pressOffset : 0;
+        $this->arrow(
+            $r,
+            $rect->shift($shift, $shift),
+            $direction,
+            $state === ControlState::Disabled ? $this->palette->textDisabled : $this->palette->text,
+        );
+    }
+
     /** {@inheritDoc} */
     public function sliderTrack(Renderer $r, Rect $rect, bool $horizontal): void
     {
@@ -382,7 +400,7 @@ abstract class BaseChrome implements Chrome
      * Border ring around the window. Filled edge by edge so the client area in
      * the middle is never painted over.
      */
-    public function windowBorder(Renderer $r, Rect $rect): void
+    public function windowBorder(Renderer $r, Rect $rect, bool $active = true): void
     {
         $t = $this->metrics->windowBorder;
 

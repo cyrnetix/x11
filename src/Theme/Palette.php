@@ -58,6 +58,10 @@ final class Palette
      * @param array{int,int,int} $iconWarning           Warning icon disc.
      * @param array{int,int,int} $iconError             Error icon disc.
      * @param array{int,int,int} $iconQuestion          Question icon disc.
+     * @param array{int,int,int}|null $captionHighlight Bevel highlight of the *active* caption; null = $faceHighlight.
+     * @param array{int,int,int}|null $captionShadow    Bevel shadow of the active caption; null = $faceShadow.
+     * @param array{int,int,int}|null $contentHighlight Bevel highlight a well draws in its own colour; null = $faceHighlight.
+     * @param array{int,int,int}|null $contentShadow    Bevel shadow of a well in its own colour; null = $faceShadow.
      */
     public function __construct(
         public readonly array $face                = [212, 208, 200],
@@ -102,6 +106,14 @@ final class Palette
         public readonly array $iconWarning         = [220, 170,   0],
         public readonly array $iconError           = [200,   0,   0],
         public readonly array $iconQuestion        = [  0, 110, 110],
+        // Null for the same reason as $desktop and $panel: a theme that does
+        // not bevel its caption, or that bevels a well in the face's colours
+        // (every Windows era), should follow *its own* face rather than get a
+        // Solaris colour it never asked for.
+        public readonly ?array $captionHighlight   = null,
+        public readonly ?array $captionShadow      = null,
+        public readonly ?array $contentHighlight   = null,
+        public readonly ?array $contentShadow      = null,
     ) {}
 
     /**
@@ -148,6 +160,43 @@ final class Palette
     public function desktopColor(): array
     {
         return $this->desktop ?? $this->face;
+    }
+
+    /**
+     * Bevel colours of the active caption, for an era whose title bar is a 3D
+     * panel in a colour of its own. Motif computes a top and bottom shadow for
+     * every background it is given, so a rose title bar gets rose shadows; the
+     * inactive caption is the face colour and uses the face's.
+     *
+     * @return array{int, int, int}
+     */
+    public function captionHighlight(): array
+    {
+        return $this->captionHighlight ?? $this->faceHighlight;
+    }
+
+    /** @return array{int, int, int} */
+    public function captionShadow(): array
+    {
+        return $this->captionShadow ?? $this->faceShadow;
+    }
+
+    /**
+     * Bevel colours of a well drawn in the content's *own* colour — Motif
+     * shades a text field from its cream background, not from the grey around
+     * it. Null means the face's shadows, which is how Windows draws a well.
+     *
+     * @return array{int, int, int}
+     */
+    public function contentHighlight(): array
+    {
+        return $this->contentHighlight ?? $this->faceHighlight;
+    }
+
+    /** @return array{int, int, int} */
+    public function contentShadow(): array
+    {
+        return $this->contentShadow ?? $this->faceShadow;
     }
 
     /** Colour for a text role — the one lookup every painter needs. */

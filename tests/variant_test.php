@@ -32,6 +32,7 @@ use Cyrnetix\X11\Drawing\Renderer;
 use Cyrnetix\X11\Theme\BaseTheme;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Solaris9\Solaris9Theme;
 use Cyrnetix\X11\Theme\Chrome;
 use Cyrnetix\X11\Theme\Corner;
 use Cyrnetix\X11\Theme\Fluent\FluentTheme;
@@ -200,7 +201,7 @@ $check('a variant switch is announced as one', $heard,
 
 echo "the themes that shipped before this\n";
 
-foreach ([new PlatinumTheme(), new CdeTheme(), new BeOsTheme()] as $theme) {
+foreach ([new PlatinumTheme(), new CdeTheme(), new Solaris9Theme(), new BeOsTheme()] as $theme) {
     $check(sprintf('%s still has exactly one variant', $theme->id()), count($theme->variants()), 1);
 }
 
@@ -248,7 +249,8 @@ $check('the older themes stay square', [
     (new Win9xTheme())->metrics()->cornerRadius,
     (new Win9xTheme())->metrics()->windowCornerRadius,
     (new CdeTheme())->metrics()->windowCornerRadius,
-], [0, 0, 0]);
+    (new Solaris9Theme())->metrics()->windowCornerRadius,
+], [0, 0, 0, 0]);
 
 echo "the corner curve\n";
 

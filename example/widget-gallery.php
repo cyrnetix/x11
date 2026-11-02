@@ -44,6 +44,7 @@ use Cyrnetix\X11\Handler\UnmapHandler;
 use Cyrnetix\X11\Logging\ColoredLineFormatter;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Solaris9\Solaris9Theme;
 use Cyrnetix\X11\Theme\Fluent\FluentTheme;
 use Cyrnetix\X11\Theme\Material\MaterialTheme;
 use Cyrnetix\X11\Theme\Platinum\PlatinumTheme;
@@ -158,6 +159,7 @@ $themes = new ThemeManager(
     new Win31Theme(),
     new PlatinumTheme(),
     new CdeTheme(),
+    new Solaris9Theme(),
     new BeOsTheme(),
     new FluentTheme(),
     new MaterialTheme(),

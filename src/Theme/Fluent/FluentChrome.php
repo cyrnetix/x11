@@ -349,7 +349,7 @@ final class FluentChrome extends BaseChrome
     }
 
     /** {@inheritDoc} */
-    public function windowBorder(Renderer $r, Rect $rect): void
+    public function windowBorder(Renderer $r, Rect $rect, bool $active = true): void
     {
         // One hairline round the whole window. The corners are cut by the SHAPE
         // extension to the same curve, so the border follows them for free —

@@ -40,6 +40,7 @@ use Cyrnetix\X11\Handler\ConfigureHandler;
 use Cyrnetix\X11\Handler\ExposeHandler;
 use Cyrnetix\X11\Theme\BeOs\BeOsTheme;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Solaris9\Solaris9Theme;
 use Cyrnetix\X11\Theme\Fluent\FluentTheme;
 use Cyrnetix\X11\Theme\Material\MaterialTheme;
 use Cyrnetix\X11\Theme\Platinum\PlatinumTheme;
@@ -76,7 +77,7 @@ $logger = new Logger('calc');
 $logger->pushHandler(new StreamHandler('php://stderr', Level::Warning));
 
 $themes = new ThemeManager(
-    new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new BeOsTheme(),
+    new Win9xTheme(), new Win31Theme(), new PlatinumTheme(), new CdeTheme(), new Solaris9Theme(), new BeOsTheme(),
     new FluentTheme(), new MaterialTheme(),
 );
 
@@ -239,7 +240,7 @@ $keys = new KeyTranslator();
 
 // The theme order F2 cycles through. Registration order, which is also the order
 // a View menu would offer them in.
-$themeIds = ['win9x', 'win31', 'platinum', 'cde', 'beos', 'fluent', 'material'];
+$themeIds = ['win9x', 'win31', 'platinum', 'cde', 'solaris9', 'beos', 'fluent', 'material'];
 
 $registry->addListener(
     X11KeyPressEvent::class,

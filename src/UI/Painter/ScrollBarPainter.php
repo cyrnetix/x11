@@ -83,23 +83,15 @@ final class ScrollBarPainter
         bool $pressed,
         bool $scrollable,
     ): void {
-        $chrome  = $this->themes->chrome();
-        $palette = $this->themes->palette();
-
         $state = match (true) {
             !$scrollable => ControlState::Disabled,
             $pressed     => ControlState::Pressed,
             default      => ControlState::Normal,
         };
 
-        $chrome->button($r, $rect, $state);
-
-        $shift = $pressed ? $this->themes->metrics()->pressOffset : 0;
-        $chrome->arrow(
-            $r,
-            $rect->shift($shift, $shift),
-            $direction,
-            $scrollable ? $palette->text : $palette->textDisabled,
-        );
+        // The theme draws the whole cap: a button with an arrow on it in most
+        // eras, a bare bevelled triangle in the trough under Motif. Deciding
+        // that here would make every scrollbar a Windows scrollbar.
+        $this->themes->chrome()->scrollArrow($r, $rect, $direction, $state);
     }
 }

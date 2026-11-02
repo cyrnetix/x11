@@ -37,6 +37,7 @@ use Cyrnetix\X11\Event\X11ButtonReleaseEvent;
 use Cyrnetix\X11\Event\X11MotionEvent;
 use Cyrnetix\X11\Protocol\SetupParser;
 use Cyrnetix\X11\Theme\Cde\CdeTheme;
+use Cyrnetix\X11\Theme\Solaris9\Solaris9Theme;
 use Cyrnetix\X11\Theme\ThemeManager;
 use Cyrnetix\X11\Theme\Win9x\Win9xTheme;
 use Cyrnetix\X11\UI\Event\CanvasPaintEvent;
